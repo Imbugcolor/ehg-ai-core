@@ -1,0 +1,33 @@
+# Bí mật — TUYỆT ĐỐI không commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Ghi chú làm việc cá nhân, không phải phần bàn giao
+genspark.md
+
+# Kết quả chạy thử, log
+*.log
+tmp/
+out/
+q.json
+
+# Supabase CLI
+supabase/.branches/
+supabase/.temp/
+.supabase/
+
+# Hệ điều hành và trình soạn thảo
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

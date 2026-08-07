@@ -1,0 +1,25 @@
+{
+  "name": "coh-ai-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "COH — AI Core (HM3). Bản nháp trả lời khách có dẫn nguồn từ kho tri thức.",
+  "scripts": {
+    "dev": "node server/app.mjs",
+    "nap-kb": "node scripts/ingest-kb.mjs",
+    "do-tan-cong": "node scripts/attack-test.mjs",
+    "do-phu-song": "node scripts/phu-song-test.mjs",
+    "do-guardrail": "node scripts/guardrail-test.mjs",
+    "do-giao-dien": "node scripts/ui-test.mjs",
+    "hieu-chuan": "node scripts/calibrate.mjs"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "jsdom": "^24.1.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
