@@ -137,17 +137,17 @@ Ranh giới đặt ở đó vì lược đồ là hợp đồng — nó đi ra n
 
 | Quy ước | Ví dụ |
 |---|---|
-| snake_case toàn bộ | ,  |
-| tên bảng là danh từ SỐ ÍT |  chứ không phải  |
-| boolean mở đầu  hoặc  | ,  |
-| mốc thời gian kết thúc  | ,  |
-| khoá ngoại là  | ,  |
-| số đếm , tỉ lệ  | ,  |
-| đơn vị trong tên khi dễ nhầm | ,  |
+| snake_case toàn bộ | `booking_segment`, `guest_email` |
+| tên bảng là danh từ **số ít** | `booking` chứ không phải `bookings` |
+| boolean mở đầu `is_` hoặc `has_` | `is_active`, `is_disabled` |
+| mốc thời gian kết thúc `_at` | `created_at`, `expires_at` |
+| khoá ngoại là `<bảng>_id` | `property_id`, `booking_id` |
+| số đếm `_count`, tỉ lệ `_ratio` | `adult_count`, `edit_ratio` |
+| đơn vị trong tên khi dễ nhầm | `daily_limit_usd`, `duration_ms` |
 
-**Giá trị enum vẫn giữ tiếng Việt** — , , ,
-. Đó là từ vựng nghiệp vụ, không phải tên kỹ thuật, và chúng
-nằm trong prompt gửi model nên đổi là phải đo lại toàn bộ.
+**Giá trị enum vẫn giữ tiếng Việt** — `toan_he`, `tinh_nang`, `HOI_GIA`,
+`xin_loi_su_co`. Đó là từ vựng nghiệp vụ chứ không phải tên kỹ thuật, và chúng
+nằm trong prompt gửi cho model — đổi là phải hiệu chuẩn và đo lại toàn bộ.
 
 ### Khoá và bí mật
 
