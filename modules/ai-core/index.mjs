@@ -121,7 +121,7 @@ const TU_CHOI_CUA_MODEL = /kho tri thức|khong du co so|knowledge base/i;
  *            diem:number, banNhap?:string, yDinh?:string,
  *            lyDoChan?:string, lopChan?:number, nguon?:Array, ms:number}}
  */
-export async function soanNhap(cauHoi, { userId, lang = 'vi', propertyId = null, ghiLog = true, onToken = null, onGiaiDoan = null } = {}) {
+export async function soanNhap(cauHoi, { userId, lang = 'vi', propertyId = null, lichSu = null, ghiLog = true, onToken = null, onGiaiDoan = null } = {}) {
   const t0 = Date.now();
   const ket = (o) => ({ ms: Date.now() - t0, ...o });
 
@@ -137,7 +137,7 @@ export async function soanNhap(cauHoi, { userId, lang = 'vi', propertyId = null,
 
   let kq;
   try {
-    kq = await chayDuongOng(cauHoi, { userId, lang, propertyId, onToken, onGiaiDoan }, ket);
+    kq = await chayDuongOng(cauHoi, { userId, lang, propertyId, lichSu, onToken, onGiaiDoan }, ket);
   } catch (e) {
     kq = batLoi(e);
   }
@@ -147,7 +147,7 @@ export async function soanNhap(cauHoi, { userId, lang = 'vi', propertyId = null,
   return kq;
 }
 
-async function chayDuongOng(cauHoi, { userId, lang, propertyId = null, onToken = null, onGiaiDoan = null }, ket) {
+async function chayDuongOng(cauHoi, { userId, lang, propertyId = null, lichSu = null, onToken = null, onGiaiDoan = null }, ket) {
   const bao = (ten, chiTiet) => onGiaiDoan?.({ giaiDoan: ten, ...chiTiet });
 
   // ⓪ Một lượt truy vấn duy nhất lấy đủ: nút tắt, phạm vi, phiên bản tri thức,
@@ -171,10 +171,43 @@ async function chayDuongOng(cauHoi, { userId, lang, propertyId = null, onToken =
     });
   }
 
+  // ① rưỡi. VIẾT LẠI CÂU HỎI thành câu đứng một mình được, trước cả cache.
+  //
+  // Phải đứng ở đây chứ không thể muộn hơn, vì hai lý do độc lập nhau:
+  //
+  //   • Khoá cache. Hai người ở hai cuộc hội thoại khác nhau cùng gõ "thế còn
+  //     cái kia?" sẽ ra cùng một khoá nếu khoá tính theo câu thô — và người này
+  //     nhận câu trả lời dành cho người kia. Khoá phải tính theo câu ĐÃ VIẾT
+  //     LẠI, lúc đó hai câu giống nhau thật sự mới dùng chung câu trả lời.
+  //   • Lớp chặn ý định. "Thế còn giá thì sao?" không khớp luật nào, nhưng viết
+  //     lại thành "giá phòng Deluxe bao nhiêu?" thì khớp ngay. Không viết lại
+  //     trước thì tấn công chia nhỏ qua nhiều lượt đi lọt.
+  //
+  // Câu hỏi tiếng Việt mở đầu hội thoại không tốn thêm lượt gọi model nào —
+  // hàm này trả về ngay khi không có gì phải làm.
+  const { truyVan, daDoi } = await chuanBiTruyVan(cauHoi, lang, lichSu);
+
+  // Chặn ý định LẦN HAI trên câu đã viết lại. Lần đầu ở trên bắt câu hỏi thẳng
+  // và rẻ; lần này bắt câu nối tiếp mà một mình nó trông vô hại.
+  if (daDoi) {
+    const yLuatMoi = nhanDienLuat(truyVan);
+    if (yLuatMoi) {
+      return ket({
+        ketQua: 'CHAN_Y_DINH',
+        yDinh: yLuatMoi,
+        diem: 0,
+        lyDoChan: Y_DINH_CAM[yLuatMoi].ten,
+        lopChan: 0,
+        banNhap: Y_DINH_CAM[yLuatMoi].mau ?? undefined,
+        truyVan,
+      });
+    }
+  }
+
   // ② Cache. Khoá gồm cả phạm vi khách sạn nên người của khách sạn này không
   // bao giờ ăn được câu trả lời của khách sạn kia.
   const nguCanhCache = cb.nguCanhCache;
-  const khoa = taoKhoa({ cauHoi, lang, ...nguCanhCache });
+  const khoa = taoKhoa({ cauHoi: truyVan, lang, ...nguCanhCache });
   const daCo = await tim(khoa);
   if (daCo) return ket({ ...daCo, tuCache: true });
 
@@ -182,14 +215,8 @@ async function chayDuongOng(cauHoi, { userId, lang, propertyId = null, onToken =
   // Phân loại là một lượt gọi model nhưng nhãn của nó chỉ cần tới lúc chọn giọng
   // văn. Cho nó chạy nền thay vì bắt việc tìm kiếm đứng chờ — đo được tiết kiệm
   // hơn một giây trên đường tới chữ đầu tiên.
-  const huaNhan = cfg.phanLoai ? phanLoai(cauHoi).catch(() => null) : Promise.resolve(null);
+  const huaNhan = cfg.phanLoai ? phanLoai(truyVan).catch(() => null) : Promise.resolve(null);
 
-  // Kho tri thức viết bằng tiếng Việt. Câu hỏi tiếng khác được dịch trước khi
-  // đi tìm — đo được tách đúng 20/23 thay vì 18/23, và quan trọng hơn là sàn
-  // điểm của nhóm câu hợp lệ nâng từ 0,070 lên 0,198, ra khỏi vùng nhiễu.
-  //
-  // Chỉ CÂU ĐI TÌM được dịch. Bản nháp vẫn trả lời câu gốc, bằng ngôn ngữ gốc.
-  const { truyVan, daDich } = await chuanBiTruyVan(cauHoi, lang);
   const qv = await embed(truyVan);
 
   // RLS của người dùng vẫn áp dụng: chạy dưới role authenticated với đúng uid.
@@ -314,7 +341,20 @@ async function chayDuongOng(cauHoi, { userId, lang, propertyId = null, onToken =
 
   const tinNhan = [
     { role: 'system', content: [heThong, chiDanPhamVi, chiDanGiong, chiDanMau].filter(Boolean).join('\n\n') },
-    { role: 'user', content: `NGỮ CẢNH:\n${nguCanh}\n\nCÂU HỎI CỦA KHÁCH: ${cauHoi}` },
+    {
+      role: 'user',
+      content:
+        `NGỮ CẢNH:\n${nguCanh}\n\n` +
+        // Hội thoại trước đó là để bản nháp nối tiếp tự nhiên — biết khách đã
+        // được trả lời gì rồi để khỏi lặp lại. KHÔNG phải nguồn thông tin: mọi
+        // dữ kiện vẫn phải lấy từ phần NGỮ CẢNH ở trên.
+        (lichSu?.length
+          ? `HỘI THOẠI TRƯỚC ĐÓ (chỉ để hiểu mạch, không phải nguồn thông tin):\n` +
+            lichSu.slice(-6).map((t) => `${t.nguoi || 'Khách'}: ${t.noiDung ?? t.noi_dung ?? ''}`).join('\n') +
+            '\n\n'
+          : '') +
+        `CÂU HỎI CỦA KHÁCH: ${cauHoi}`,
+    },
   ];
 
   bao('soan_nhap', { nguon: giuLai.map((g) => ({ chunk_id: g.chunk_id, title: g.title })) });
@@ -346,7 +386,7 @@ async function chayDuongOng(cauHoi, { userId, lang, propertyId = null, onToken =
   await luu(khoa, { cauHoi, lang, ...nguCanhCache, ketQua: 'TRA_LOI', diem, banNhap, nguon: giuLai });
   // Ghi lại việc đã cứu vớt để còn soát: nếu về sau tỉ lệ sửa của nhóm cứu vớt
   // cao hơn hẳn nhóm qua thẳng thì luật này đang nới quá tay.
-  return ket({ ketQua: 'TRA_LOI', diem, soUngVien: ungVien.length, banNhap, nhan, tokens: chiPhi.lanCuoi, nguon: giuLai, cuuVot, truyVan: daDich ? truyVan : undefined });
+  return ket({ ketQua: 'TRA_LOI', diem, soUngVien: ungVien.length, banNhap, nhan, tokens: chiPhi.lanCuoi, nguon: giuLai, cuuVot, truyVan: daDoi ? truyVan : undefined });
 }
 
 export { chiPhi } from './adapters.mjs';

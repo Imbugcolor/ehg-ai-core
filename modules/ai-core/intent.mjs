@@ -68,8 +68,20 @@ const LUAT = [
   { y: 'HOI_GIA', re: /giá\s*(phòng|phong|room)/i },
   { y: 'HOI_GIA', re: /bảng\s*giá/i },
   { y: 'HOI_GIA', re: /(giá|chi phí)\s*(cho\s*)?(một|1|mỗi)\s*(đêm|ngày|người\/đêm)/i },
-  { y: 'HOI_GIA', re: /phòng[^.?]{0,20}(bao nhiêu tiền|giá bao nhiêu|mấy tiền|giá thế nào)/i },
+  // "Phòng" đứng một mình mới là phòng nghỉ. "Phòng tập", "phòng họp", "phòng
+  // tắm" là chuyện khác, và hỏi giá chúng là hỏi giá DỊCH VỤ — được phép.
+  // Đo được: "phòng tập gym bao nhiêu tiền một tháng" bị luật này chặn nhầm.
+  { y: 'HOI_GIA', re: /phòng(?!\s*(tập|họp|gym|thay|tắm|chờ|ăn|khách))[^.?]{0,20}(bao nhiêu tiền|giá bao nhiêu|mấy tiền|giá thế nào)/i },
   { y: 'HOI_GIA', re: /(báo giá|quote|niêm yết giá)/i },
+  // "một đêm" đi cùng câu hỏi tiền là giá thuê phòng, không thể là gì khác —
+  // không ai hỏi giá spa hay giá giặt là theo đêm. Bắt được cả hai thứ tự.
+  //
+  // Cần luật này vì luật "phòng … bao nhiêu tiền" ở trên giới hạn 20 ký tự
+  // giữa hai vế, mà câu viết lại từ hội thoại nhiều lượt thường dài hơn thế:
+  // "Phòng Deluxe hướng biển một đêm giá bao nhiêu tiền?" cách nhau 30 ký tự
+  // nên lọt qua, phải để cổng tin cậy đỡ — kém chắc hơn hẳn.
+  { y: 'HOI_GIA', re: /(một|1|mỗi)\s*(đêm|ngày)[^.?]{0,24}(giá|bao nhiêu|mất bao nhiêu|hết bao nhiêu)/i },
+  { y: 'HOI_GIA', re: /(giá|bao nhiêu tiền)[^.?]{0,24}(một|1|mỗi)\s*(đêm|ngày)/i },
 
   // Phòng trống, giữ phòng, đặt hộ
   { y: 'HOI_PHONG_TRONG', re: /(còn|có)\s*phòng\s*(trống|nào|không)/i },

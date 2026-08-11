@@ -238,7 +238,13 @@ async function soan() {
   const res = await fetch('/api/soan-nhap-stream', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ cauHoi, code: $('nguoi').value }),
+    // Gửi kèm các lượt TRƯỚC câu này. Lát nữa mới đẩy câu hiện tại vào LICH_SU,
+    // nên cắt bỏ lượt cuối để câu hỏi không xuất hiện hai lần.
+    body: JSON.stringify({
+      cauHoi,
+      code: $('nguoi').value,
+      lichSu: LICH_SU.slice(0, -1).map((t) => ({ nguoi: t.nguoi, noiDung: t.noi_dung })),
+    }),
   });
 
   const doc = res.body.getReader();

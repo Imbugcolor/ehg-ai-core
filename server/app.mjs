@@ -86,6 +86,7 @@ const API = {
     const r = await soanNhap(String(body.cauHoi || '').trim(), {
       userId: u.user_id,
       propertyId: u.property_id,
+      lichSu: Array.isArray(body.lichSu) ? body.lichSu : null,
     });
     return { ...r, khachSan: u.name };
   },
@@ -184,6 +185,7 @@ async function soanNhapStream(req, res) {
     const r = await soanNhap(String(body.cauHoi || '').trim(), {
       userId: u.user_id,
       propertyId: u.property_id,
+      lichSu: Array.isArray(body.lichSu) ? body.lichSu : null,
       onToken: (mau) => banTin('mau', { mau }),
       onGiaiDoan: (g) => banTin('giai_doan', g),
     });
