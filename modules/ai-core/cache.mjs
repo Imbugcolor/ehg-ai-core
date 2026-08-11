@@ -27,11 +27,17 @@ export function chuanHoa(s) {
 
 // TĂNG SỐ NÀY mỗi khi đổi ngưỡng tin cậy, luật cứu vớt, danh sách điều cấm hay
 // prompt soạn nháp. Đây là cách duy nhất để cache cũ không che mất luật mới.
-export const PHIEN_BAN_LUAT = 12;
+export const PHIEN_BAN_LUAT = 13;
 
-export function taoKhoa({ cauHoi, scopeKey, lang, kbVersion }) {
+export function taoKhoa({ cauHoi, scopeKey, lang, kbVersion, vanTaySo = '' }) {
+  // vanTaySo là vân tay của sổ ghi nhớ hội thoại. Sổ ảnh hưởng tới bản nháp,
+  // nên hai hội thoại có sổ khác nhau KHÔNG được dùng chung câu trả lời — cùng
+  // một bẫy với việc mở ngữ cảnh nhiều lượt, chỉ khác chỗ phát sinh.
+  //
+  // Hội thoại chưa có sổ thì vân tay rỗng và khoá y như cũ, nên câu hỏi lẻ —
+  // phần lớn lưu lượng — vẫn dùng chung cache bình thường.
   return createHash('sha256')
-    .update(`${chuanHoa(cauHoi)}|${scopeKey}|${lang}|${kbVersion}|l${PHIEN_BAN_LUAT}`)
+    .update(`${chuanHoa(cauHoi)}|${scopeKey}|${lang}|${kbVersion}|l${PHIEN_BAN_LUAT}|s${vanTaySo}`)
     .digest('hex');
 }
 

@@ -22,6 +22,7 @@ import { taoKhoa, tim, luu } from './cache.mjs';
 import { chuanBi } from './chuanbi.mjs';
 import { phanLoai } from './classify.mjs';
 import { chuanBiTruyVan, SO_TIN_NHAN_NHO } from './truyvan.mjs';
+import { laySo, luuSo, capNhatSo, thanhChiDanSo, vanTaySo } from './soghinho.mjs';
 import { layPrompt, layMauThu, tinhHuongTheoNhan, thanhChiDanMau, MAC_DINH } from './prompt.mjs';
 import { layGiongVan, thanhChiDan, loaiKhachTheoNhan } from './tone.mjs';
 import { chiPhi } from './adapters.mjs';
@@ -121,7 +122,7 @@ const TU_CHOI_CUA_MODEL = /kho tri thức|khong du co so|knowledge base/i;
  *            diem:number, banNhap?:string, yDinh?:string,
  *            lyDoChan?:string, lopChan?:number, nguon?:Array, ms:number}}
  */
-export async function soanNhap(cauHoi, { userId, lang = 'vi', propertyId = null, lichSu = null, ghiLog = true, onToken = null, onGiaiDoan = null } = {}) {
+export async function soanNhap(cauHoi, { userId, lang = 'vi', propertyId = null, lichSu = null, threadKey = null, ghiLog = true, onToken = null, onGiaiDoan = null } = {}) {
   const t0 = Date.now();
   const ket = (o) => ({ ms: Date.now() - t0, ...o });
 
@@ -135,11 +136,25 @@ export async function soanNhap(cauHoi, { userId, lang = 'vi', propertyId = null,
     throw e;
   };
 
+  // Hộp để đường ống trả sổ đã đọc ra ngoài, khỏi phải đọc lại lần hai.
+  const hop = {};
+
   let kq;
   try {
-    kq = await chayDuongOng(cauHoi, { userId, lang, propertyId, lichSu, onToken, onGiaiDoan }, ket);
+    kq = await chayDuongOng(cauHoi, { userId, lang, propertyId, lichSu, threadKey, onToken, onGiaiDoan }, ket, hop);
   } catch (e) {
     kq = batLoi(e);
+  }
+
+  // Cập nhật sổ ghi nhớ bằng chính câu khách vừa hỏi. CHẠY NỀN, không chờ:
+  // nhân viên cần thấy bản nháp ngay, còn sổ chỉ cần sẵn sàng trước lượt sau.
+  //
+  // Chạy cả khi lượt này bị chặn. Khách nói "đoàn 8 người" trong một câu hỏi
+  // giá bị chặn thì "8 người" vẫn là dữ kiện thật, vẫn phải nhớ.
+  if (threadKey) {
+    capNhatSo(hop.so || {}, [{ nguoi: 'Khách', noiDung: cauHoi }])
+      .then((moi) => luuSo(threadKey, propertyId, moi))
+      .catch(() => {});
   }
   // Ghi nhật ký MỘT lần ở cuối, và trả kèm mã dòng nhật ký để nối với
   // phần ghi nhận nhân viên sửa bản nháp (HM3.8).
@@ -147,7 +162,7 @@ export async function soanNhap(cauHoi, { userId, lang = 'vi', propertyId = null,
   return kq;
 }
 
-async function chayDuongOng(cauHoi, { userId, lang, propertyId = null, lichSu = null, onToken = null, onGiaiDoan = null }, ket) {
+async function chayDuongOng(cauHoi, { userId, lang, propertyId = null, lichSu = null, threadKey = null, onToken = null, onGiaiDoan = null }, ket, hop = {}) {
   const bao = (ten, chiTiet) => onGiaiDoan?.({ giaiDoan: ten, ...chiTiet });
 
   // ⓪ Một lượt truy vấn duy nhất lấy đủ: nút tắt, phạm vi, phiên bản tri thức,
@@ -185,7 +200,16 @@ async function chayDuongOng(cauHoi, { userId, lang, propertyId = null, lichSu = 
   //
   // Câu hỏi tiếng Việt mở đầu hội thoại không tốn thêm lượt gọi model nào —
   // hàm này trả về ngay khi không có gì phải làm.
-  const { truyVan, daDoi } = await chuanBiTruyVan(cauHoi, lang, lichSu);
+  // Sổ ghi nhớ hội thoại. Chứa những dữ kiện khách nói từ trước mà đã trôi
+  // khỏi cửa sổ sáu tin nhắn — mấy người, ngày nào, mã đặt phòng.
+  const so = threadKey ? await laySo(threadKey) : {};
+  hop.so = so;
+  const chiDanSo = thanhChiDanSo(so);
+
+  // Bước viết lại được đọc sổ. Đây là chỗ sổ có tác dụng lớn nhất: "đoàn tôi
+  // lúc nãy nói ấy" khôi phục được thành "đoàn 8 người ngày 20" kể cả khi câu
+  // đó đã trôi khỏi cửa sổ từ lâu.
+  const { truyVan, daDoi } = await chuanBiTruyVan(cauHoi, lang, lichSu, chiDanSo);
 
   // Chặn ý định LẦN HAI trên câu đã viết lại. Lần đầu ở trên bắt câu hỏi thẳng
   // và rẻ; lần này bắt câu nối tiếp mà một mình nó trông vô hại.
@@ -207,7 +231,9 @@ async function chayDuongOng(cauHoi, { userId, lang, propertyId = null, lichSu = 
   // ② Cache. Khoá gồm cả phạm vi khách sạn nên người của khách sạn này không
   // bao giờ ăn được câu trả lời của khách sạn kia.
   const nguCanhCache = cb.nguCanhCache;
-  const khoa = taoKhoa({ cauHoi: truyVan, lang, ...nguCanhCache });
+  // Vân tay sổ nằm trong khoá. Thiếu nó thì hai hội thoại có sổ khác nhau
+  // dùng chung một bản nháp — người này nhận câu viết cho người kia.
+  const khoa = taoKhoa({ cauHoi: truyVan, lang, ...nguCanhCache, vanTaySo: vanTaySo(so) });
   const daCo = await tim(khoa);
   if (daCo) return ket({ ...daCo, tuCache: true });
 
@@ -345,6 +371,7 @@ async function chayDuongOng(cauHoi, { userId, lang, propertyId = null, lichSu = 
       role: 'user',
       content:
         `NGỮ CẢNH:\n${nguCanh}\n\n` +
+        (chiDanSo ? `${chiDanSo}\n\n` : '') +
         // Hội thoại trước đó là để bản nháp nối tiếp tự nhiên — biết khách đã
         // được trả lời gì rồi để khỏi lặp lại. KHÔNG phải nguồn thông tin: mọi
         // dữ kiện vẫn phải lấy từ phần NGỮ CẢNH ở trên.
