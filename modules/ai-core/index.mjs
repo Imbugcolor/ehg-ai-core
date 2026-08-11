@@ -21,7 +21,7 @@ import { ghiNhatKy } from './log.mjs';
 import { taoKhoa, tim, luu } from './cache.mjs';
 import { chuanBi } from './chuanbi.mjs';
 import { phanLoai } from './classify.mjs';
-import { chuanBiTruyVan } from './truyvan.mjs';
+import { chuanBiTruyVan, SO_TIN_NHAN_NHO } from './truyvan.mjs';
 import { layPrompt, layMauThu, tinhHuongTheoNhan, thanhChiDanMau, MAC_DINH } from './prompt.mjs';
 import { layGiongVan, thanhChiDan, loaiKhachTheoNhan } from './tone.mjs';
 import { chiPhi } from './adapters.mjs';
@@ -350,7 +350,7 @@ async function chayDuongOng(cauHoi, { userId, lang, propertyId = null, lichSu = 
         // dữ kiện vẫn phải lấy từ phần NGỮ CẢNH ở trên.
         (lichSu?.length
           ? `HỘI THOẠI TRƯỚC ĐÓ (chỉ để hiểu mạch, không phải nguồn thông tin):\n` +
-            lichSu.slice(-6).map((t) => `${t.nguoi || 'Khách'}: ${t.noiDung ?? t.noi_dung ?? ''}`).join('\n') +
+            lichSu.slice(-SO_TIN_NHAN_NHO).map((t) => `${t.nguoi || 'Khách'}: ${t.noiDung ?? t.noi_dung ?? ''}`).join('\n') +
             '\n\n'
           : '') +
         `CÂU HỎI CỦA KHÁCH: ${cauHoi}`,
