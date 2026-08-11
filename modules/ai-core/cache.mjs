@@ -27,7 +27,7 @@ export function chuanHoa(s) {
 
 // TĂNG SỐ NÀY mỗi khi đổi ngưỡng tin cậy, luật cứu vớt, danh sách điều cấm hay
 // prompt soạn nháp. Đây là cách duy nhất để cache cũ không che mất luật mới.
-export const PHIEN_BAN_LUAT = 8;
+export const PHIEN_BAN_LUAT = 10;
 
 export function taoKhoa({ cauHoi, scopeKey, lang, kbVersion }) {
   return createHash('sha256')

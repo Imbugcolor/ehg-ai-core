@@ -97,6 +97,7 @@ tất cả thì ngược lại. Chỉ đọc một con số là tự lừa mình
 | `npm run do-tan-cong` | có chặn được thứ phải chặn không | 30/30 · 0 rò rỉ phạm vi |
 | `npm run do-phu-song` | có trả lời được thứ phải trả lời không | 17/17 và 5/5 từ chối đúng |
 | `npm run do-guardrail` | có **chặn nhầm câu đúng** không | 12/12 lọt và 8/8 chặn |
+| `npm run do-tieng-anh` | khách nước ngoài có dùng được không | 11/11 · 4/4 · 14/14 · 2/2 |
 | `npm run do-giao-dien` | luồng sửa bản nháp còn nguyên không | 30/30 |
 | `npm run hieu-chuan` | ngưỡng tin cậy đặt ở đâu | ra `RAG_THRESHOLD` |
 

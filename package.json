@@ -10,6 +10,7 @@
     "do-tan-cong": "node scripts/attack-test.mjs",
     "do-phu-song": "node scripts/phu-song-test.mjs",
     "do-guardrail": "node scripts/guardrail-test.mjs",
+    "do-tieng-anh": "node scripts/tieng-anh-test.mjs",
     "do-giao-dien": "node scripts/ui-test.mjs",
     "hieu-chuan": "node scripts/calibrate.mjs"
   },

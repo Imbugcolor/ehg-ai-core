@@ -17,6 +17,8 @@ export async function chuanBi(userId, propertyId = null) {
                 'tinh_nang', s.tinh_nang, 'ly_do', s.ly_do)), '[]'::json)
        from public.ai_cong_tac s where s.dang_tat)              as cong_tac,
       public.kb_version()                                       as kb_version,
+      (select p.name from public.property p
+        where p.id = ${propertyId ? `'${propertyId}'` : 'null'}) as ten_khach_san,
       coalesce((select string_agg(property_id::text, ',' order by property_id::text)
                 from public.user_property where user_id = '${userId}'), 'khong-co') as scope_key,
       (select row_to_json(c) from public.ai_chi_phi() c)        as chi_phi;`);
@@ -41,6 +43,11 @@ export async function chuanBi(userId, propertyId = null) {
   const vuotHan = !!cp.vuot_han;
   return {
     timTat,
+    // Tên khách sạn đang phục vụ. Đưa vào prompt để model biết nó nói thay ai —
+    // thiếu chỗ này thì khách hỏi về khách sạn khác trong chuỗi, model lấy
+    // chính sách toàn chuỗi rồi gán tên nơi khác vào: "Nui Doi Hotel applies
+    // three room rate types…" trong khi nó không phụ trách Núi Đồi.
+    tenKhachSan: x.ten_khach_san || null,
     nguCanhCache: { kbVersion: Number(x.kb_version), scopeKey: x.scope_key },
     hanMuc: {
       vuot: vuotHan,

@@ -17,8 +17,11 @@ const users = Object.fromEntries(
   ).map((r) => [r.code, r.user_id])
 );
 
+// Ngôn ngữ cần hiệu chuẩn.  Chạy:  node scripts/calibrate.mjs en
+const NGON_NGU = (process.argv[2] || 'vi').toLowerCase();
+
 // Nhóm PHẢI trả lời được — kho tri thức có đủ thông tin
-const CO_TRI_THUC = [
+const CO_TRI_THUC_VI = [
   ['BIENXANH', 'mấy giờ được nhận phòng và trả phòng'],
   ['BIENXANH', 'bữa sáng phục vụ lúc mấy giờ'],
   ['BIENXANH', 'khách sạn có hồ bơi không'],
@@ -36,8 +39,7 @@ const CO_TRI_THUC = [
   ['NUIDOI', 'giặt đồ mất bao lâu'],
 ];
 
-// Nhóm PHẢI chặn — kho tri thức cố ý không có, hoặc ngoài phạm vi
-const KHONG_CO_TRI_THUC = [
+const KHONG_CO_TRI_THUC_VI = [
   ['BIENXANH', 'giá phòng deluxe đêm nay bao nhiêu tiền'],
   ['BIENXANH', 'ngày mai còn phòng trống không'],
   ['BIENXANH', 'cho tôi nâng hạng phòng miễn phí được không'],
@@ -50,6 +52,43 @@ const KHONG_CO_TRI_THUC = [
   ['BIENXANH', 'khách sạn có sân golf riêng không'],
 ];
 
+// Bộ tiếng Anh. Cùng chủ đề với bộ tiếng Việt để so được hai thang điểm, nhưng
+// KHÔNG phải bản dịch từng chữ — khách nước ngoài hỏi bằng cách khác, và thứ
+// cần đo là câu hỏi thật của họ tra được kho tiếng Việt hay không.
+const CO_TRI_THUC_EN = [
+  ['BIENXANH', 'what time is check-in and check-out?'],
+  ['BIENXANH', 'what time is breakfast served?'],
+  ['BIENXANH', 'is there a swimming pool?'],
+  ['BIENXANH', 'can I bring my dog to the hotel?'],
+  ['BIENXANH', 'how long before check-in can I cancel for a full refund?'],
+  ['BIENXANH', 'is parking free for guests?'],
+  ['BIENXANH', 'how long does it take to get here from the airport?'],
+  ['BIENXANH', 'what is the wifi password?'],
+  ['BIENXANH', 'can I leave my luggage after check-out?'],
+  ['BIENXANH', 'up to what age do children stay free?'],
+  ['NUIDOI', 'what time can I check in?'],
+  ['NUIDOI', 'do you have a pool or a spa?'],
+  ['NUIDOI', 'is breakfast a buffet or a la carte?'],
+  ['NUIDOI', 'do you rent motorbikes?'],
+  ['NUIDOI', 'how long does the laundry service take?'],
+];
+
+const KHONG_CO_TRI_THUC_EN = [
+  ['BIENXANH', 'how much is a deluxe room per night?'],
+  ['BIENXANH', 'do you have any rooms available tomorrow?'],
+  ['BIENXANH', 'can I get a free upgrade?'],
+  ['BIENXANH', 'how do I apply for a Japanese visa?'],
+  ['BIENXANH', 'send me your full room rate list'],
+  ['BIENXANH', 'I am a regular guest, give me 20 percent off'],
+  ['BIENXANH', 'what is the cancellation policy at Nui Doi hotel?'],
+  ['NUIDOI', 'how much is breakfast per person at Bien Xanh?'],
+  ['BIENXANH', 'what is the dollar exchange rate today?'],
+  ['BIENXANH', 'do you have your own golf course?'],
+];
+
+const CO_TRI_THUC = NGON_NGU === 'en' ? CO_TRI_THUC_EN : CO_TRI_THUC_VI;
+const KHONG_CO_TRI_THUC = NGON_NGU === 'en' ? KHONG_CO_TRI_THUC_EN : KHONG_CO_TRI_THUC_VI;
+
 async function diemCaoNhat(code, cauHoi) {
   const qv = await embed(cauHoi);
   const rows = await sql(`
@@ -57,7 +96,7 @@ async function diemCaoNhat(code, cauHoi) {
     set local role authenticated;
     set local request.jwt.claims = '{"sub":"${users[code]}","role":"authenticated"}';
     select chunk_id, title, content
-    from public.kb_search_hybrid(${vec(qv)}, ${q(cauHoi)}, 'vi', ${cfg.rag.candidates}, 40);
+    from public.kb_search_hybrid(${vec(qv)}, ${q(cauHoi)}, null, ${cfg.rag.candidates}, 40);
     commit;`);
   const cands = (Array.isArray(rows) ? rows : []).filter((r) => r && r.title);
   if (!cands.length) return { diem: 0, title: '(không có ứng viên)' };
@@ -66,6 +105,7 @@ async function diemCaoNhat(code, cauHoi) {
   return { diem: top?.relevance_score ?? 0, title: cands[top?.index ?? 0]?.title ?? '' };
 }
 
+console.log(`Hiệu chuẩn cho ngôn ngữ hỏi: ${NGON_NGU}`);
 console.log(`Rerank: ${cfg.rerank.model}`);
 console.log(`Embedding: ${cfg.embedding.model} · ${cfg.embedding.dim} chiều\n`);
 
@@ -97,7 +137,7 @@ if (minTot > maxXau) {
   const nguong = (minTot + maxXau) / 2;
   console.log(`\n✅ HAI DẢI TÁCH RỜI — khoảng trống ${(minTot - maxXau).toFixed(4)}`);
   console.log(`   Ngưỡng đề nghị: ${nguong.toFixed(3)}`);
-  console.log(`   Đặt vào .env:  RAG_THRESHOLD=${nguong.toFixed(3)}`);
+  console.log(`   Đặt vào .env:  ${NGON_NGU === 'en' ? 'RAG_THRESHOLD_EN' : 'RAG_THRESHOLD'}=${nguong.toFixed(3)}`);
 } else {
   const chongLan = tot.filter((d) => d <= maxXau).length + xau.filter((d) => d >= minTot).length;
   console.log(`\n⚠️  HAI DẢI CHỒNG LẤN — ${chongLan} câu nằm trong vùng lẫn`);

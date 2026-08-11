@@ -68,6 +68,19 @@ export const cfg = {
     // khác hẳn nhau (0.42 so với 0.15 cho cùng một đoạn đúng). Đổi reranker là
     // PHẢI hiệu chuẩn lại bằng scripts/calibrate.mjs, không mang ngưỡng cũ sang.
     threshold: Number(or('RAG_THRESHOLD', 0.5)),
+    // Ngưỡng RIÊNG cho từng ngôn ngữ hỏi.
+    //
+    // Câu hỏi tiếng Anh tra kho tiếng Việt cho thang điểm lệch hẳn so với câu
+    // hỏi tiếng Việt: đo được cùng bộ xếp hạng, "Can I bring my dog" đạt 0,707
+    // trong khi "What time is check-in" chỉ 0,342 và "airport pickup" 0,198.
+    // Dải rộng hơn và thấp hơn tiếng Việt, nên dùng chung một ngưỡng là chặn
+    // oan hàng loạt.
+    //
+    // Không khai báo thì lùi về ngưỡng chung — chạy được nhưng chưa hiệu chuẩn,
+    // và scripts/calibrate.mjs sẽ nhắc.
+    thresholdTheoNgonNgu: {
+      en: process.env.RAG_THRESHOLD_EN ? Number(process.env.RAG_THRESHOLD_EN) : null,
+    },
     maxTokens: Number(or('RAG_MAX_TOKENS', 1200)),
   },
 };

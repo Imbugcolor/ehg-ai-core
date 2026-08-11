@@ -92,6 +92,38 @@ const LUAT = [
   { y: 'KENH_OTA', re: /(huỷ|hủy).{0,30}(booking|agoda|expedia|traveloka|ota).{0,30}(đặt trực tiếp|đặt thẳng|rẻ hơn)/i },
   { y: 'KENH_OTA', re: /(chuyển khoản|thanh toán).{0,20}(thẳng|trực tiếp).{0,24}(khỏi|không qua|thay vì)/i },
   { y: 'KENH_OTA', re: /(giá trên|giá ở)\s*(booking|agoda|expedia)/i },
+
+  // ─── Tiếng Anh ────────────────────────────────────────────────────────────
+  //
+  // Lớp chặn tất định phải có cả hai thứ tiếng. Trước đây chỉ có tiếng Việt, và
+  // câu tấn công tiếng Anh vẫn bị chặn — nhưng bởi cổng tin cậy, tức là chặn
+  // được nhờ kho toàn tiếng Việt nên câu tiếng Anh lấy điểm thấp. Đó là chặn
+  // may rủi: kho có tiếng Anh là lớp đỡ đó biến mất.
+  //
+  // Viết theo cùng nguyên tắc với bản tiếng Việt: chỉ bắt những cụm KHÔNG THỂ
+  // xuất hiện hợp lệ. "How much" một mình thì không bắt — "how much is the
+  // airport transfer" là câu hỏi giá dịch vụ hoàn toàn bình thường.
+  { y: 'HOI_GIA', re: /\b(room|nightly|per[- ]night)\s*(rate|price|cost)s?\b/i },
+  { y: 'HOI_GIA', re: /\bhow much\b[^.?]{0,30}\b(a|per|the)\s*(night|room)\b/i },
+  { y: 'HOI_GIA', re: /\b(price|rate)\s*(list|sheet)\b|\bquote me\b/i },
+  { y: 'HOI_GIA', re: /\bcheapest\s*(room|rate|price)\b/i },
+
+  { y: 'HOI_PHONG_TRONG', re: /\b(any|have|got)\s*(rooms?|availability)\s*(available|free|left)?\b.{0,20}\?/i },
+  { y: 'HOI_PHONG_TRONG', re: /\b(hold|reserve|book)\s*(me|a room|us)\b/i },
+  { y: 'HOI_PHONG_TRONG', re: /\bconfirm\b[^.?]{0,24}\b(room|availability)\s*(is\s*)?available\b/i },
+
+  { y: 'XIN_UU_DAI', re: /\b(free|complimentary)\s*(upgrade|room|suite)\b/i },
+  { y: 'XIN_UU_DAI', re: /\b(upgrade)\s*(me|us|my room)\b/i },
+  { y: 'XIN_UU_DAI', re: /\b(discount|special (rate|deal)|better (price|rate))\b[^.?]{0,24}\b(for me|for us)\b/i },
+
+  { y: 'YEU_CAU_HANH_DONG', re: /\b(send|email)\s*(it|this|the confirmation)\b[^.?]{0,20}\b(for me|yourself|directly)\b/i },
+  { y: 'YEU_CAU_HANH_DONG', re: /\byou\s*(just\s*)?(book|reserve|write|enter|approve)\b/i },
+  { y: 'YEU_CAU_HANH_DONG', re: /\b(write|enter|update|push)\b[^.?]{0,20}\b(pms|smile|the system)\b/i },
+  { y: 'YEU_CAU_HANH_DONG', re: /\bapprove\s*(this|it)\s*(and send|then send)?\b/i },
+
+  { y: 'KENH_OTA', re: /\bcancel\b[^.?]{0,30}\b(booking\.com|booking|agoda|expedia|traveloka|ota)\b[^.?]{0,30}\bbook (direct|directly|with you)\b/i },
+  { y: 'KENH_OTA', re: /\b(pay|transfer)\b[^.?]{0,24}\b(directly|outside)\b[^.?]{0,24}\b(instead of|rather than|not through)\b/i },
+  { y: 'KENH_OTA', re: /\b(price|rate)\s*on\s*(booking\.com|booking|agoda|expedia)\b/i },
 ];
 
 export function nhanDienLuat(cauHoi) {

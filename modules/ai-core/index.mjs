@@ -21,17 +21,29 @@ import { ghiNhatKy } from './log.mjs';
 import { taoKhoa, tim, luu } from './cache.mjs';
 import { chuanBi } from './chuanbi.mjs';
 import { phanLoai } from './classify.mjs';
+import { chuanBiTruyVan } from './truyvan.mjs';
 import { layPrompt, layMauThu, tinhHuongTheoNhan, thanhChiDanMau, MAC_DINH } from './prompt.mjs';
 import { layGiongVan, thanhChiDan, loaiKhachTheoNhan } from './tone.mjs';
 import { chiPhi } from './adapters.mjs';
 
 // Vùng lẫn: đo được hai dải điểm chồng lấn nhau, nên trong khoảng này một con số
 // là không đủ để quyết. Ngoài khoảng thì tin cổng tin cậy, đỡ một lượt gọi model.
-const VUNG_LAN = [cfg.rag.threshold, cfg.rag.threshold + 0.15];
+// Ngưỡng và vùng lẫn tính THEO NGÔN NGỮ HỎI. Câu tiếng Anh tra kho tiếng Việt
+// cho thang điểm khác hẳn câu tiếng Việt, dùng chung một mức là chặn oan.
+//
+// Chưa hiệu chuẩn cho ngôn ngữ nào thì lùi về ngưỡng chung — chạy được, nhưng
+// đó là mức của tiếng Việt và gần như chắc chắn không vừa.
+function nguongCua(lang) {
+  return cfg.rag.thresholdTheoNgonNgu?.[lang] ?? cfg.rag.threshold;
+}
+// Vùng lẫn giữ đúng bề rộng tương đối so với ngưỡng, không phải một hằng số
+// cộng thêm — cộng 0,15 vào ngưỡng 0,26 khác hẳn cộng vào ngưỡng 0,08.
+const BE_RONG_VUNG_LAN = 0.58;
+const vungLanTren = (lang) => nguongCua(lang) * (1 + BE_RONG_VUNG_LAN);
 
 // Sàn cứng cho đường cứu vớt. Dưới mức này thì dù dồn về một tài liệu cũng
 // không cứu — bộ xếp hạng đang đoán mò chứ không phải khớp.
-const SAN_CUU = 0.14;
+const TI_LE_SAN_CUU = 0.54;   // sàn cứu vớt = 0,54 lần ngưỡng, không phải một số cố định
 // Đoạn đầu phải hơn đoạn đầu tiên của tài liệu KHÁC bao nhiêu lần mới tính là
 // dồn thật sự.
 //
@@ -39,7 +51,7 @@ const SAN_CUU = 0.14;
 // thì trượt câu "trời lạnh phòng có sưởi không" — ba đoạn đầu đều cùng tài liệu
 // và đều nói về sưởi, mà cách biệt chỉ 1,15 lần. Hạ xuống 1,1 và đo lại: bộ tấn
 // công vẫn chặn đủ, vì các câu tấn công bị chặn ở điểm 0,07–0,10, nằm dưới sàn
-// SAN_CUU nên không chạm tới luật này.
+// cứu vớt nên không chạm tới luật này.
 //
 // Phải đo lại khi có dữ liệu câu hỏi thật, và phải đo lại khi đổi bộ xếp hạng.
 const BOI_CACH_BIET = 1.1;
@@ -58,8 +70,8 @@ const CAN_CUNG_TAI_LIEU = 3;
 // Truy hồi đúng nhưng điểm thấp thì các đoạn đầu sẽ dồn về cùng một tài liệu và
 // bỏ xa phần còn lại. Truy hồi sai thì điểm thấp đi kèm phân tán — mỗi đoạn một
 // tài liệu, cách biệt không đáng kể. Hàm này phân biệt hai trường hợp đó.
-function xetDonTaiLieu(giuLai, diem) {
-  if (diem < SAN_CUU || giuLai.length < CAN_CUNG_TAI_LIEU) return null;
+function xetDonTaiLieu(giuLai, diem, nguong) {
+  if (diem < nguong * TI_LE_SAN_CUU || giuLai.length < CAN_CUNG_TAI_LIEU) return null;
 
   // Tài liệu đứng đầu phải chiếm đủ chỗ trong nhóm dẫn đầu. Xếp hạng nhất mà
   // các đoạn sau tản mát mỗi nơi một tài liệu thì đó là đoán mò, không phải khớp.
@@ -98,7 +110,11 @@ const HE_THONG = MAC_DINH.soan_nhap;   // bản thật đọc từ bảng ai_pro
 // "Kho tri thức" là từ nội bộ. Thư gửi khách không bao giờ được nhắc tới nó,
 // nên bản nháp nào có cụm này thì hoặc là lời từ chối, hoặc là đang để lộ
 // chuyện bên trong — cả hai đều không phải thứ đưa cho nhân viên gửi đi.
-const TU_CHOI_CUA_MODEL = /kho tri thức|khong du co so/i;
+// Phải có cả bản tiếng Anh. Đo được: câu "What is the dollar exchange rate
+// today?" được model từ chối đúng bằng "There is not enough information in the
+// knowledge base to answer this" — mà bộ nhận diện chỉ bắt tiếng Việt nên lời
+// từ chối đó lọt xuống dưới nhãn TRA_LOI. Bộ đo báo là BỊA, thật ra là đếm sai.
+const TU_CHOI_CUA_MODEL = /kho tri thức|khong du co so|knowledge base/i;
 
 /**
  * @returns {{ketQua:'TRA_LOI'|'KHONG_DU_CO_SO'|'BI_CHAN'|'CHAN_Y_DINH',
@@ -167,9 +183,30 @@ async function chayDuongOng(cauHoi, { userId, lang, propertyId = null, onToken =
   // văn. Cho nó chạy nền thay vì bắt việc tìm kiếm đứng chờ — đo được tiết kiệm
   // hơn một giây trên đường tới chữ đầu tiên.
   const huaNhan = cfg.phanLoai ? phanLoai(cauHoi).catch(() => null) : Promise.resolve(null);
-  const qv = await embed(cauHoi);
+
+  // Kho tri thức viết bằng tiếng Việt. Câu hỏi tiếng khác được dịch trước khi
+  // đi tìm — đo được tách đúng 20/23 thay vì 18/23, và quan trọng hơn là sàn
+  // điểm của nhóm câu hợp lệ nâng từ 0,070 lên 0,198, ra khỏi vùng nhiễu.
+  //
+  // Chỉ CÂU ĐI TÌM được dịch. Bản nháp vẫn trả lời câu gốc, bằng ngôn ngữ gốc.
+  const { truyVan, daDich } = await chuanBiTruyVan(cauHoi, lang);
+  const qv = await embed(truyVan);
 
   // RLS của người dùng vẫn áp dụng: chạy dưới role authenticated với đúng uid.
+  //
+  // KHÔNG lọc theo ngôn ngữ khi tìm. Trước đây truyền lang vào đây, và `lang`
+  // gánh hai nghĩa cùng lúc: tìm trong kho ngôn ngữ nào, và trả lời bằng ngôn
+  // ngữ nào. Hậu quả: khách hỏi tiếng Anh thì kho tiếng Việt bị loại sạch, còn
+  // 0 ứng viên, hệ thống trả "không đủ dữ liệu" — trông như không hiểu tiếng
+  // Anh, thật ra là chưa kịp đọc gì.
+  //
+  // Model embedding và xếp hạng đều đa ngôn ngữ, nên câu hỏi tiếng Anh tra được
+  // tài liệu tiếng Việt. Giờ `lang` chỉ còn nghĩa "trả lời bằng tiếng gì".
+  //
+  // Khi kho có nhiều ngôn ngữ: cùng một chính sách viết hai thứ tiếng sẽ chiếm
+  // hai chỗ trong nhóm ứng viên. Lúc đó cần gom trùng theo tài liệu gốc, chưa
+  // phải bây giờ vì kho mới có tiếng Việt.
+  //
   // Lấy kèm mã tài liệu và SỐ PHIÊN BẢN, không chỉ tiêu đề.
   //
   // Trích dẫn chỉ có tiêu đề thì truy vết được một nửa: biết bản nháp dựa trên
@@ -185,7 +222,7 @@ async function chayDuongOng(cauHoi, { userId, lang, propertyId = null, onToken =
     set local role authenticated;
     set local request.jwt.claims = '{"sub":"${userId}","role":"authenticated"}';
     select s.chunk_id, s.document_id, s.title, s.content, d.version, d.updated_at
-    from public.kb_search_hybrid(${vec(qv)}, ${q(cauHoi)}, ${q(lang)}, ${cfg.rag.candidates}, 40) s
+    from public.kb_search_hybrid(${vec(qv)}, ${q(truyVan)}, null, ${cfg.rag.candidates}, 40) s
     join public.kb_document d on d.id = s.document_id
     order by s.rrf_score desc;
     commit;`);
@@ -199,7 +236,7 @@ async function chayDuongOng(cauHoi, { userId, lang, propertyId = null, onToken =
     .catch(() => null);
 
   const xepHang = await rerank(
-    cauHoi,
+    truyVan,
     ungVien.map((c) => `${c.title}. ${c.content}`),
     cfg.rag.keep
   );
@@ -221,14 +258,15 @@ async function chayDuongOng(cauHoi, { userId, lang, propertyId = null, onToken =
   // trả lời, dù điểm thấp. Vẫn có sàn cứng bên dưới để không cứu bừa.
   // Chỉ tính là cứu vớt khi điểm THẬT SỰ dưới ngưỡng — không thì mọi câu dồn
   // về một tài liệu đều bị gắn nhãn cứu vớt và con số theo dõi thành vô nghĩa.
-  const cuuVot = diem < cfg.rag.threshold ? xetDonTaiLieu(giuLai, diem) : null;
-  if (diem < cfg.rag.threshold && !cuuVot) {
+  const nguong = nguongCua(lang);
+  const cuuVot = diem < nguong ? xetDonTaiLieu(giuLai, diem, nguong) : null;
+  if (diem < nguong && !cuuVot) {
     await luu(khoa, { cauHoi, lang, ...nguCanhCache, ketQua: 'KHONG_DU_CO_SO', diem, nguon: giuLai });
     return ket({ ketQua: 'KHONG_DU_CO_SO', diem, soUngVien: ungVien.length, nhan, nguon: giuLai });
   }
 
   // ④ Trong vùng lẫn thì hỏi thêm model xem ý định có nằm trong nhóm cấm không.
-  if (diem <= VUNG_LAN[1]) {
+  if (diem <= vungLanTren(lang)) {
     const yModel = await nhanDienBangModel(cauHoi);
     if (yModel) {
       return ket({
@@ -264,8 +302,18 @@ async function chayDuongOng(cauHoi, { userId, lang, propertyId = null, onToken =
   // Thứ tự có ý nghĩa: quy tắc bắt buộc trước, rồi giọng văn, rồi khung thư.
   // Chỉ dẫn đứng sau không được phép nới lỏng chỉ dẫn đứng trước — khung thư là
   // gợi ý bố cục, không phải chỗ lách các điều cấm ở prompt gốc.
+  // Nói rõ đang làm cho khách sạn nào. Không có dòng này thì model không biết
+  // khách sạn nào là "của mình" và khách sạn nào là "nơi khác" — đo được: khách
+  // hỏi chính sách huỷ của Núi Đồi, model lấy chính sách toàn chuỗi rồi viết
+  // "Nui Doi Hotel applies…" dù nó đang phục vụ Biển Xanh.
+  const chiDanPhamVi = cb.tenKhachSan
+    ? lang === 'en'
+      ? `You work for ${cb.tenKhachSan} and speak only for this property. Any other hotel named in the guest's message is a different property you do not represent.`
+      : `Bạn làm cho ${cb.tenKhachSan} và chỉ phát ngôn cho khách sạn này. Mọi khách sạn khác được nhắc tới trong câu hỏi đều là nơi bạn không phụ trách.`
+    : '';
+
   const tinNhan = [
-    { role: 'system', content: [heThong, chiDanGiong, chiDanMau].filter(Boolean).join('\n\n') },
+    { role: 'system', content: [heThong, chiDanPhamVi, chiDanGiong, chiDanMau].filter(Boolean).join('\n\n') },
     { role: 'user', content: `NGỮ CẢNH:\n${nguCanh}\n\nCÂU HỎI CỦA KHÁCH: ${cauHoi}` },
   ];
 
@@ -298,7 +346,7 @@ async function chayDuongOng(cauHoi, { userId, lang, propertyId = null, onToken =
   await luu(khoa, { cauHoi, lang, ...nguCanhCache, ketQua: 'TRA_LOI', diem, banNhap, nguon: giuLai });
   // Ghi lại việc đã cứu vớt để còn soát: nếu về sau tỉ lệ sửa của nhóm cứu vớt
   // cao hơn hẳn nhóm qua thẳng thì luật này đang nới quá tay.
-  return ket({ ketQua: 'TRA_LOI', diem, soUngVien: ungVien.length, banNhap, nhan, tokens: chiPhi.lanCuoi, nguon: giuLai, cuuVot });
+  return ket({ ketQua: 'TRA_LOI', diem, soUngVien: ungVien.length, banNhap, nhan, tokens: chiPhi.lanCuoi, nguon: giuLai, cuuVot, truyVan: daDich ? truyVan : undefined });
 }
 
 export { chiPhi } from './adapters.mjs';
