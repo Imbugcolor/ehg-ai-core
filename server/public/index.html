@@ -309,8 +309,13 @@ function ketThuc(bong, oNoi, r, chuDaChay) {
     them(`<div class="phu" style="margin-top:7px">${esc(r.lyDoChan)}</div>`);
 
   if (r.nguon?.length)
+    // Hiện cả số phiên bản tài liệu. Nhân viên cần biết bản nháp dựa trên bản
+    // chính sách nào — chính sách sửa rồi mà nháp còn dẫn bản cũ thì phải thấy.
     them(`<div class="nguon">Nguồn: ` +
-      r.nguon.map((n, i) => `<b>[${i + 1}]</b> ${esc(n.title)}`).join(' · ') + `</div>`);
+      r.nguon.map((n, i) =>
+        `<b>[${i + 1}]</b> ${esc(n.title)}` +
+        (n.version != null ? `<span class="phu"> b.${esc(String(n.version))}</span>` : '')
+      ).join(' · ') + `</div>`);
 
   them(`<div class="meta">
     <span>tin cậy <b>${(r.diem ?? 0).toFixed(3)}</b></span><span>${r.ms} ms</span>

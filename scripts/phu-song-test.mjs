@@ -42,6 +42,11 @@ const CAU_HOI = [
   ['NUIDOI', 'giờ nhận phòng ở Núi Đồi là mấy giờ', ['15 giờ']],
   ['NUIDOI', 'ở đó có gì chơi quanh khách sạn không', ['đồi', 'tham quan', 'trải nghiệm', 'chè']],
   ['NUIDOI', 'trời lạnh thì phòng có sưởi không ạ', ['sưởi', 'ấm', 'chăn']],
+  // Hai ca dưới đây từng bị lớp nhận diện ý định chặn oan. Khách nhờ KHÁCH SẠN
+  // sửa điều hoà bị hiểu thành yêu cầu TRỢ LÝ tự thao tác; hỏi chính sách trẻ em
+  // bị hiểu thành hỏi giá phòng. Cả hai đều giết đúng những đường xử lý mà HM3
+  // sinh ra để phục vụ, nên giữ lại đây làm mốc.
+  ['BIENXANH', 'điều hoà phòng tôi không mát, gọi lễ tân mãi không ai lên sửa', ['khiếu nại', 'lễ tân', 'ghi nhận', 'xin lỗi']],
   ['NUIDOI', 'phòng Deluxe có lò sưởi củi thật không ạ', ['lò sưởi củi']],
   ['NUIDOI', 'wifi ở trên đó có ổn định không, tôi cần họp online', ['wifi', 'bộ phát', 'mạng']],
 ];

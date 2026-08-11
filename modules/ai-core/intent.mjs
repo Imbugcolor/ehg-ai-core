@@ -108,11 +108,28 @@ const HE_THONG = `Phân loại ý định câu hỏi của khách khách sạn. 
 - HOI_GIA: hỏi giá phòng, bảng giá, chi phí lưu trú
 - HOI_PHONG_TRONG: hỏi còn phòng, xin giữ phòng, nhờ đặt phòng
 - XIN_UU_DAI: xin nâng hạng, giảm giá, ưu đãi riêng
-- YEU_CAU_HANH_DONG: yêu cầu hệ thống tự gửi thư, tự đặt phòng, tự ghi vào hệ thống
+- YEU_CAU_HANH_DONG: yêu cầu chính TRỢ LÝ này tự thao tác — tự gửi thư đi, tự
+  đặt phòng, tự ghi vào hệ thống PMS, tự duyệt
 - KENH_OTA: rủ huỷ đặt phòng trên kênh OTA để đặt trực tiếp, hoặc thanh toán ngoài kênh
 - BINH_THUONG: mọi câu hỏi khác về tiện ích, giờ giấc, chính sách, hướng dẫn
 
-Hỏi về CHÍNH SÁCH huỷ phòng, phụ thu hay điều kiện hoàn tiền là BINH_THUONG, không phải HOI_GIA.`;
+HOI_GIA chỉ tính khi khách hỏi GIÁ THUÊ PHÒNG MỘT ĐÊM là bao nhiêu tiền. Những
+thứ sau là BINH_THUONG, không phải HOI_GIA:
+- chính sách huỷ phòng, phụ thu, điều kiện hoàn tiền
+- chính sách trẻ em: trẻ mấy tuổi được miễn phí, có tính thêm tiền không,
+  giường phụ tính thế nào
+- giá các DỊCH VỤ ngoài tiền phòng: xe đưa đón, spa, giặt là, bữa sáng thêm,
+  gửi hành lý, đỗ xe
+Đây đều là chính sách niêm yết, khách có quyền được biết và kho tri thức có sẵn.
+
+Phân biệt cho kỹ: khách nhờ KHÁCH SẠN làm gì đó — sửa điều hoà, dọn phòng, mang
+thêm khăn, gọi taxi, ghi nhận khiếu nại — là BINH_THUONG. Đó là nghiệp vụ hằng
+ngày, nhân viên vẫn xử lý bình thường. Chỉ tính YEU_CAU_HANH_DONG khi khách bảo
+chính trợ lý tự thực hiện một thao tác ra bên ngoài thay người.
+
+Khách phàn nàn kèm câu "gọi mãi không ai lên", "nhắn mấy lần không ai trả lời"
+vẫn là BINH_THUONG. Đó là lời than phiền về dịch vụ, không phải mệnh lệnh cho
+trợ lý.`;
 
 export async function nhanDienBangModel(cauHoi) {
   let raw = '';

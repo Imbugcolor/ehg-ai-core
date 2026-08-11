@@ -27,7 +27,7 @@ export function chuanHoa(s) {
 
 // TĂNG SỐ NÀY mỗi khi đổi ngưỡng tin cậy, luật cứu vớt, danh sách điều cấm hay
 // prompt soạn nháp. Đây là cách duy nhất để cache cũ không che mất luật mới.
-export const PHIEN_BAN_LUAT = 4;
+export const PHIEN_BAN_LUAT = 8;
 
 export function taoKhoa({ cauHoi, scopeKey, lang, kbVersion }) {
   return createHash('sha256')
@@ -67,7 +67,15 @@ export async function tim(khoa) {
 
 export async function luu(khoa, { cauHoi, scopeKey, lang, kbVersion, propertyId, ketQua, banNhap, diem, nguon }) {
   const cites = JSON.stringify(
-    (nguon || []).map((n) => ({ chunk_id: n.chunk_id, title: n.title }))
+    // Giữ cả mã tài liệu và số phiên bản. Thiếu phiên bản thì trích dẫn chỉ nói
+    // được "lấy từ tài liệu nào", không nói được "lấy từ bản nào" — mà kho tri
+    // thức thì liên tục đổi.
+    (nguon || []).map((n) => ({
+      chunk_id: n.chunk_id,
+      kb_id: n.document_id ?? n.kb_id ?? null,
+      version: n.version ?? null,
+      title: n.title,
+    }))
   );
   const ids = (nguon || []).map((n) => `'${n.chunk_id}'`).join(',');
   try {
