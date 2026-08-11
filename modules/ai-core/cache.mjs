@@ -27,7 +27,7 @@ export function chuanHoa(s) {
 
 // TĂNG SỐ NÀY mỗi khi đổi ngưỡng tin cậy, luật cứu vớt, danh sách điều cấm hay
 // prompt soạn nháp. Đây là cách duy nhất để cache cũ không che mất luật mới.
-export const PHIEN_BAN_LUAT = 13;
+export const PHIEN_BAN_LUAT = 14;
 
 export function taoKhoa({ cauHoi, scopeKey, lang, kbVersion, vanTaySo = '' }) {
   // vanTaySo là vân tay của sổ ghi nhớ hội thoại. Sổ ảnh hưởng tới bản nháp,
@@ -56,18 +56,18 @@ export async function layNguCanhCache(userId) {
 
 export async function tim(khoa) {
   const r = await sql(`
-    select ket_qua, answer, citations, diem
+    select outcome, answer, citations, score
     from public.rag_cache where cache_key = ${q(khoa)} limit 1;`);
-  if (!r.length || !r[0].ket_qua) return null;
+  if (!r.length || !r[0].outcome) return null;
   // Cập nhật lượt dùng, không chờ kết quả để khỏi làm chậm câu trả lời
   sql(`update public.rag_cache
        set hit_count = hit_count + 1, last_used_at = now()
        where cache_key = ${q(khoa)};`).catch(() => {});
   return {
-    ketQua: r[0].ket_qua,
+    ketQua: r[0].outcome,
     banNhap: r[0].answer ?? undefined,
     nguon: r[0].citations ?? [],
-    diem: Number(r[0].diem ?? 0),
+    diem: Number(r[0].score ?? 0),
   };
 }
 
@@ -87,15 +87,15 @@ export async function luu(khoa, { cauHoi, scopeKey, lang, kbVersion, propertyId,
   try {
     await sql(`
       insert into public.rag_cache
-        (cache_key, question, property_id, lang, kb_version, scope_key, chunk_ids, answer, citations, ket_qua, diem)
+        (cache_key, question, property_id, lang, kb_version, scope_key, chunk_ids, answer, citations, outcome, score)
       values (${q(khoa)}, ${q(cauHoi)}, ${propertyId ? `'${propertyId}'` : 'null'}, ${q(lang)},
               ${kbVersion}, ${q(scopeKey)}, ARRAY[${ids}]::uuid[], ${banNhap ? q(banNhap) : 'null'},
               ${q(cites)}::jsonb, ${q(ketQua)}, ${Number(diem) || 0})
       on conflict (cache_key) do update
         set answer = excluded.answer,
             citations = excluded.citations,
-            ket_qua = excluded.ket_qua,
-            diem = excluded.diem,
+            outcome = excluded.outcome,
+            score = excluded.score,
             last_used_at = now();`);
   } catch (e) {
     console.error('[rag_cache] không lưu được:', e.message.slice(0, 140));

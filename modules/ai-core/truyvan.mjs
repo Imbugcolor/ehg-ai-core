@@ -82,7 +82,7 @@ export const SO_TIN_NHAN_NHO = 6;
 const thanhVanBan = (lichSu) =>
   (lichSu || [])
     .slice(-SO_TIN_NHAN_NHO)
-    .map((t) => `${t.nguoi || 'Khách'}: ${t.noiDung ?? t.noi_dung ?? ''}`)
+    .map((t) => `${t.nguoi || 'Khách'}: ${t.noiDung ?? t.body ?? ''}`)
     .join('\n');
 
 /**

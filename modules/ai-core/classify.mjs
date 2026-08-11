@@ -58,8 +58,8 @@ export async function phanLoai(noiDung) {
   try {
     const v = JSON.parse(m[0]);
     const nhan = NHAN[v.nhan] ? v.nhan : 'KHAC';
-    const camXuc = ['tich_cuc', 'trung_tinh', 'tieu_cuc'].includes(v.cam_xuc) ? v.cam_xuc : 'trung_tinh';
-    const doGap = ['thap', 'trung', 'cao'].includes(v.do_gap) ? v.do_gap : 'thap';
+    const camXuc = ['tich_cuc', 'trung_tinh', 'tieu_cuc'].includes(v.sentiment) ? v.sentiment : 'trung_tinh';
+    const doGap = ['thap', 'trung', 'cao'].includes(v.urgency) ? v.urgency : 'thap';
     return { nhan, camXuc, doGap };
   } catch {
     return null;

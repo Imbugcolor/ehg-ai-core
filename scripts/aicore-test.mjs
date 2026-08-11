@@ -26,7 +26,7 @@ const hoi = async (code, cauHoi) => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 console.log('══ ① Nút tắt khẩn ══\n');
-await sql('delete from public.ai_cong_tac;');
+await sql('delete from public.ai_kill_switch;');
 await sql('delete from public.rag_cache;');
 xoaNhoTam();
 
@@ -89,7 +89,7 @@ for (const m of MAU) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 console.log('\n══ ④ Đo tỉ lệ sửa bản nháp ══\n');
-await sql('delete from public.ai_nhap_da_sua;');
+await sql('delete from public.ai_draft_edit;');
 
 const CAP = [
   ['Chào quý khách, hồ bơi mở từ 6 giờ đến 21 giờ. Trân trọng,',
@@ -106,5 +106,5 @@ for (const [goc, sua, nhan] of CAP) {
 }
 
 const tk = await thongKe();
-console.log(`\n  Tổng: ${tk.tong.so_ban} bản · trung bình sửa ${(tk.tong.ty_le_sua_tb * 100).toFixed(1)}%`);
-console.log(`  Dùng được ngay: ${tk.tong.dung_duoc_ngay}/${tk.tong.so_ban} = ${(tk.tong.ty_le_dung_duoc * 100).toFixed(1)}%  (tiêu chí nghiệm thu: >70%)`);
+console.log(`\n  Tổng: ${tk.tong.draft_count} bản · trung bình sửa ${(tk.tong.avg_edit_ratio * 100).toFixed(1)}%`);
+console.log(`  Dùng được ngay: ${tk.tong.usable_count}/${tk.tong.draft_count} = ${(tk.tong.usable_ratio * 100).toFixed(1)}%  (tiêu chí nghiệm thu: >70%)`);

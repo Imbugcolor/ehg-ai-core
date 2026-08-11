@@ -91,7 +91,7 @@ export async function kiemDuyet(banNhap) {
   try {
     const v = JSON.parse(m[0]);
     return v.vi_pham
-      ? { viPham: true, lyDo: v.ly_do || 'model kiểm duyệt từ chối', lop: 2 }
+      ? { viPham: true, lyDo: v.reason || 'model kiểm duyệt từ chối', lop: 2 }
       : { viPham: false, lop: 2 };
   } catch {
     return { viPham: false, lop: 2 };

@@ -14,8 +14,8 @@ let nhoTam = { luc: 0, data: [] };
 async function docTrangThai() {
   if (Date.now() - nhoTam.luc < NHO_TAM_MS) return nhoTam.data;
   const r = await sql(`
-    select pham_vi, property_id::text as property_id, tinh_nang, ly_do
-    from public.ai_cong_tac where dang_tat;`);
+    select scope, property_id::text as property_id, feature, reason
+    from public.ai_kill_switch where is_disabled;`);
   nhoTam = { luc: Date.now(), data: Array.isArray(r) ? r : [] };
   return nhoTam.data;
 }
@@ -25,17 +25,17 @@ export async function kiemTraTat(tinhNang, propertyId = null) {
   const ds = await docTrangThai();
   if (!ds.length) return null;
 
-  const uuTien = { toan_he: 1, khach_san: 2, tinh_nang: 3 };
+  const uuTien = { toan_he: 1, khach_san: 2, feature: 3 };
   const khop = ds
     .filter(
       (s) =>
-        s.pham_vi === 'toan_he' ||
-        (s.pham_vi === 'khach_san' && propertyId && s.property_id === propertyId) ||
-        (s.pham_vi === 'tinh_nang' && s.tinh_nang === tinhNang)
+        s.scope === 'toan_he' ||
+        (s.scope === 'khach_san' && propertyId && s.property_id === propertyId) ||
+        (s.scope === 'tinh_nang' && s.feature === tinhNang)
     )
-    .sort((a, b) => uuTien[a.pham_vi] - uuTien[b.pham_vi])[0];
+    .sort((a, b) => uuTien[a.scope] - uuTien[b.scope])[0];
 
-  return khop ? { lyDo: khop.ly_do, phamVi: khop.pham_vi } : null;
+  return khop ? { lyDo: khop.reason, phamVi: khop.scope } : null;
 }
 
 export function xoaNhoTam() {
@@ -45,7 +45,7 @@ export function xoaNhoTam() {
 // --- Bật tắt bằng lệnh, để lúc có sự cố không phải mở giao diện ------------
 export async function tat({ phamVi, propertyId = null, tinhNang = null, lyDo, boi = null }) {
   await sql(`
-    insert into public.ai_cong_tac (pham_vi, property_id, tinh_nang, dang_tat, ly_do, boi)
+    insert into public.ai_kill_switch (scope, property_id, feature, is_disabled, reason, set_by)
     values (${q(phamVi)}, ${propertyId ? `'${propertyId}'` : 'null'},
             ${tinhNang ? q(tinhNang) : 'null'}, true, ${q(lyDo)},
             ${boi ? `'${boi}'` : 'null'});`);
@@ -54,10 +54,10 @@ export async function tat({ phamVi, propertyId = null, tinhNang = null, lyDo, bo
 
 export async function bat({ phamVi, propertyId = null, tinhNang = null }) {
   await sql(`
-    update public.ai_cong_tac set dang_tat = false
-    where dang_tat
-      and pham_vi = ${q(phamVi)}
+    update public.ai_kill_switch set is_disabled = false
+    where is_disabled
+      and scope = ${q(phamVi)}
       and property_id is not distinct from ${propertyId ? `'${propertyId}'` : 'null'}
-      and tinh_nang is not distinct from ${tinhNang ? q(tinhNang) : 'null'};`);
+      and feature is not distinct from ${tinhNang ? q(tinhNang) : 'null'};`);
   xoaNhoTam();
 }

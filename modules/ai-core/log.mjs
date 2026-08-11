@@ -30,9 +30,9 @@ export async function ghiNhatKy(ban) {
   try {
     const r = await sql(`
       insert into public.ai_log
-        (user_id, cau_hoi, ket_qua, y_dinh, diem, so_ung_vien, ban_nhap,
-         ly_do_chan, lop_chan, model_chat, model_rerank, model_embed, ms, loi_loai, loi_msg,
-         nhan_y_dinh, cam_xuc, do_gap, token_vao, token_ra, chi_phi, tu_cache, model_du_phong)
+        (user_id, question, outcome, blocked_intent, score, candidate_count, draft,
+         block_reason, block_layer, chat_model, rerank_model, embed_model, ms, error_type, error_message,
+         intent_label, sentiment, urgency, input_tokens, output_tokens, cost_usd, from_cache, fallback_model)
       values (
         ${ban.userId ? `'${ban.userId}'` : 'null'},
         ${q(che(ban.cauHoi))},

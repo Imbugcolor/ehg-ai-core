@@ -14,14 +14,14 @@
 -- =============================================================================
 
 alter table public.rag_cache
-  add column if not exists ket_qua   text,
-  add column if not exists diem      numeric(6,4),
+  add column if not exists outcome   text,
+  add column if not exists score      numeric(6,4),
   add column if not exists scope_key text;
 
 alter table public.rag_cache drop constraint if exists rag_cache_ket_qua_check;
 alter table public.rag_cache
   add constraint rag_cache_ket_qua_check
-  check (ket_qua is null or ket_qua in ('TRA_LOI', 'KHONG_DU_CO_SO'));
+  check (outcome is null or outcome in ('TRA_LOI', 'KHONG_DU_CO_SO'));
 
 comment on column public.rag_cache.scope_key is
   'Danh sách khách sạn người dùng được phép xem, đã sắp xếp. Nằm trong khoá cache.';
@@ -46,7 +46,7 @@ comment on function public.kb_version is
   'Phiên bản kho tri thức. Dùng làm một phần khoá cache để tri thức đổi thì cache tự hết hiệu lực.';
 
 -- Dọn cache cũ. Gọi định kỳ bằng pg_cron khi lên môi trường thật.
-create or replace function public.rag_cache_don(giu_ngay int default 30)
+create or replace function public.rag_cache_prune(giu_ngay int default 30)
 returns int
 language sql
 as $$

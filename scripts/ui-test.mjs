@@ -35,7 +35,7 @@ const dom = new JSDOM(html, {
           khoTriThuc: { tai_lieu: 32, doan: 115 } });
       if (url.includes('/api/gui')) {
         GUI.push(JSON.parse(o.body));
-        return json({ tyLeSua: 0.12, thongKe: { so_ban: 1, ty_le_dung_duoc: 1, ty_le_sua_tb: 0.12, dung_duoc_ngay: 1 } });
+        return json({ tyLeSua: 0.12, thongKe: { draft_count: 1, usable_ratio: 1, avg_edit_ratio: 0.12, usable_count: 1 } });
       }
       return json({ dong: [] });
     };

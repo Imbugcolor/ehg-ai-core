@@ -57,8 +57,8 @@ const API = {
   async 'GET /api/khoi-tao'() {
     const [chiPhi, tatAll, tk] = await Promise.all([
       tinhTrangChiPhi({ batBuocMoi: true }),
-      sql(`select pham_vi, property_id::text as property_id, tinh_nang, ly_do
-           from public.ai_cong_tac where dang_tat;`),
+      sql(`select scope, property_id::text as property_id, feature, reason
+           from public.ai_kill_switch where is_disabled;`),
       thongKe().catch(() => null),
     ]);
     const kb = await sql(`
@@ -102,7 +102,7 @@ const API = {
       daGui: true,
     });
     await sql(`
-      insert into public.audit_log (bang, ban_ghi_id, hanh_dong, ghi_chu)
+      insert into public.audit_log (table_name, record_id, action, note)
       values ('ai_log', ${q(String(body.logId ?? '?'))}, 'gui_mail',
               ${q(`nhân viên duyệt và gửi, sửa ${(ty * 100).toFixed(1)}%`)});`);
     return { tyLeSua: ty, thongKe: (await thongKe()).tong };
@@ -128,8 +128,8 @@ const API = {
       .map((d) => {
         const i = d.indexOf(':');
         return i > 0
-          ? { nguoi: d.slice(0, i).trim(), noi_dung: d.slice(i + 1).trim() }
-          : { nguoi: 'Khách', noi_dung: d };
+          ? { nguoi: d.slice(0, i).trim(), body: d.slice(i + 1).trim() }
+          : { nguoi: 'Khách', body: d };
       });
     if (!tin.length) return { ketQua: 'THIEU_DU_LIEU' };
     return await tomTat(tin, {
@@ -148,8 +148,8 @@ const API = {
     if (body.hanhDong === 'tat') await tat({ ...opt, lyDo: body.lyDo || 'tắt từ bảng điều khiển' });
     else await bat(opt);
     xoaNhoTam();
-    const conTat = await sql(`select pham_vi, property_id::text as property_id, tinh_nang, ly_do
-                              from public.ai_cong_tac where dang_tat;`);
+    const conTat = await sql(`select scope, property_id::text as property_id, feature, reason
+                              from public.ai_kill_switch where is_disabled;`);
     return { dangTat: conTat };
   },
 
@@ -161,8 +161,8 @@ const API = {
   async 'GET /api/nhat-ky'() {
     const r = await sql(`
       select id, to_char(created_at at time zone 'Asia/Ho_Chi_Minh','HH24:MI:SS') as luc,
-             left(cau_hoi, 70) as cau_hoi, ket_qua, y_dinh, nhan_y_dinh, cam_xuc, do_gap,
-             diem, ms, tu_cache, loi_loai
+             left(question, 70) as question, outcome, blocked_intent, intent_label, sentiment, urgency,
+             diem, ms, from_cache, error_type
       from public.ai_log order by id desc limit 25;`);
     return { dong: r };
   },

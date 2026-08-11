@@ -38,8 +38,8 @@ export function tyLeSua(banGoc, banDaSua) {
 export async function ghiNhanSua({ logId = null, banGoc, banDaSua, nhanYDinh = null, nguoiSua = null, daGui = false }) {
   const ty = tyLeSua(banGoc, banDaSua);
   await sql(`
-    insert into public.ai_nhap_da_sua
-      (log_id, ban_goc, ban_da_sua, ty_le_sua, nhan_y_dinh, nguoi_sua, da_gui)
+    insert into public.ai_draft_edit
+      (log_id, original_draft, edited_draft, edit_ratio, intent_label, edited_by, was_sent)
     values (${logId ?? 'null'}, ${q(che(banGoc))}, ${q(che(banDaSua))}, ${ty.toFixed(4)},
             ${nhanYDinh ? q(nhanYDinh) : 'null'},
             ${nguoiSua ? `'${nguoiSua}'` : 'null'}, ${daGui});`);
@@ -48,12 +48,12 @@ export async function ghiNhanSua({ logId = null, banGoc, banDaSua, nhanYDinh = n
 
 /** Thống kê phục vụ nghiệm thu. */
 export async function thongKe() {
-  const theoNhan = await sql('select * from public.ai_thong_ke_sua;');
+  const theoNhan = await sql('select * from public.ai_edit_stats;');
   const tong = await sql(`
-    select count(*) as so_ban,
-           round(avg(ty_le_sua), 4) as ty_le_sua_tb,
-           count(*) filter (where ty_le_sua <= 0.30) as dung_duoc_ngay,
-           round(count(*) filter (where ty_le_sua <= 0.30)::numeric / nullif(count(*),0), 4) as ty_le_dung_duoc
-    from public.ai_nhap_da_sua;`);
+    select count(*) as draft_count,
+           round(avg(edit_ratio), 4) as avg_edit_ratio,
+           count(*) filter (where edit_ratio <= 0.30) as usable_count,
+           round(count(*) filter (where edit_ratio <= 0.30)::numeric / nullif(count(*),0), 4) as usable_ratio
+    from public.ai_draft_edit;`);
   return { theoNhan, tong: tong[0] };
 }

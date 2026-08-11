@@ -63,9 +63,9 @@ export async function layPrompt(khoa, ngonNgu = 'vi') {
   let noiDung = null;
   try {
     const r = await sql(`
-      select noi_dung from public.ai_prompt
-      where khoa = ${q(khoa)} and ngon_ngu = ${q(ngonNgu)} and dang_dung limit 1;`);
-    noiDung = r[0]?.noi_dung || null;
+      select body from public.ai_prompt
+      where key = ${q(khoa)} and lang = ${q(ngonNgu)} and is_active limit 1;`);
+    noiDung = r[0]?.body || null;
   } catch (e) {
     // Không ném lỗi ra ngoài. Mất kết nối tới bảng cấu hình không phải lý do
     // để cả hệ thống ngừng soạn nháp — lùi về bản trong code là đủ an toàn.
@@ -113,9 +113,9 @@ export async function layMauThu({ propertyId = null, tinhHuong = null, ngonNgu =
   let data = null;
   try {
     const r = await sql(`
-      select * from public.ai_mau_thu_ap_dung(
+      select * from public.ai_reply_template_resolve(
         ${propertyId ? `'${propertyId}'` : 'null'}, ${q(tinhHuong)}, ${q(ngonNgu)});`);
-    data = r.length ? { ten: r[0].ten, noiDung: r[0].noi_dung } : null;
+    data = r.length ? { ten: r[0].name, noiDung: r[0].body } : null;
   } catch (e) {
     console.error('[mau_thu] không đọc được:', e.message.slice(0, 120));
   }

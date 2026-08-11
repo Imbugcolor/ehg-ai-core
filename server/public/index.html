@@ -202,7 +202,7 @@ const GOI_Y = [
 const cuon = () => { const c = $('chat'); c.scrollTop = c.scrollHeight; };
 
 function themKhach(text) {
-  LICH_SU.push({ nguoi: 'Khách', noi_dung: text });
+  LICH_SU.push({ nguoi: 'Khách', body: text });
   const d = document.createElement('div');
   d.className = 'bong b-khach';
   d.textContent = text;
@@ -243,7 +243,7 @@ async function soan() {
     body: JSON.stringify({
       cauHoi,
       code: $('nguoi').value,
-      lichSu: LICH_SU.slice(0, -1).map((t) => ({ nguoi: t.nguoi, noiDung: t.noi_dung })),
+      lichSu: LICH_SU.slice(0, -1).map((t) => ({ nguoi: t.nguoi, noiDung: t.body })),
     }),
   });
 
@@ -344,7 +344,7 @@ function ketThuc(bong, oNoi, r, chuDaChay) {
     const kq = await api('/api/gui', {
       logId: r.logId, banGoc: noiDung, banDaSua, nhan: r.nhan?.nhan,
     });
-    LICH_SU.push({ nguoi: 'Nhân viên', noi_dung: banDaSua });
+    LICH_SU.push({ nguoi: 'Nhân viên', body: banDaSua });
     bong.querySelector('.nhan-nhap').innerHTML =
       `<span class="nhan n-luc">✓ Đã gửi ${new Date().toLocaleTimeString('vi-VN')}</span>` +
       `<span class="phu" style="margin-left:6px">sửa ${(kq.tyLeSua * 100).toFixed(0)}%</span>`;
@@ -455,13 +455,13 @@ function ketThuc(bong, oNoi, r, chuDaChay) {
 
 // ── bảng bên phải ───────────────────────────────────────────────────────────
 function veThongKe(t) {
-  if (!t || !t.so_ban) { $('tkSua').textContent = 'chưa có dữ liệu'; return; }
-  const pt = Number(t.ty_le_dung_duoc || 0) * 100;
+  if (!t || !t.draft_count) { $('tkSua').textContent = 'chưa có dữ liệu'; return; }
+  const pt = Number(t.usable_ratio || 0) * 100;
   const mau = pt >= 70 ? 'var(--luc)' : 'var(--cam)';
   $('tkSua').innerHTML = `<div><b style="font-size:18px;color:${mau}">${pt.toFixed(0)}%</b>
-      dùng được ngay <span class="phu">(${t.dung_duoc_ngay}/${t.so_ban})</span></div>
+      dùng được ngay <span class="phu">(${t.usable_count}/${t.draft_count})</span></div>
     <div class="thanh"><i style="width:${Math.min(pt,100)}%;background:${mau}"></i></div>
-    <div class="phu" style="margin-top:4px">trung bình sửa ${(Number(t.ty_le_sua_tb||0)*100).toFixed(1)}%</div>`;
+    <div class="phu" style="margin-top:4px">trung bình sửa ${(Number(t.avg_edit_ratio||0)*100).toFixed(1)}%</div>`;
 }
 
 function veChiPhi(c) {
@@ -476,7 +476,7 @@ function veDangTat(ds) {
   $('dangTat').innerHTML = !ds?.length
     ? '<span class="nhan n-luc">đang bật</span>'
     : ds.map((t) => `<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">
-        <span class="nhan n-do">tắt · ${t.pham_vi}${t.tinh_nang ? ' · ' + t.tinh_nang : ''}</span>
+        <span class="nhan n-do">tắt · ${t.scope}${t.feature ? ' · ' + t.feature : ''}</span>
         <button class="nho" data-bat='${JSON.stringify({phamVi:t.pham_vi,tinhNang:t.tinh_nang})}'>bật</button></div>`).join('');
   $('dangTat').querySelectorAll('[data-bat]').forEach((b) => {
     b.onclick = async () => veDangTat((await api('/api/cong-tac',
@@ -488,9 +488,9 @@ async function napNhatKy() {
   const r = await api('/api/nhat-ky');
   if (!r.dong?.length) return;
   $('nhatKy').innerHTML = '<table>' + r.dong.slice(0, 12).map((d) => `<tr>
-    <td class="tt">${d.luc}</td><td>${esc((d.cau_hoi||'').slice(0,26))}</td>
-    <td><span class="nhan ${(KIEU[d.ket_qua]||['n-xam'])[0]}">${(KIEU[d.ket_qua]||[0,d.ket_qua])[1]}</span></td>
-    <td class="tt">${d.ms ?? ''}${d.tu_cache ? '⚡' : ''}</td></tr>`).join('') + '</table>';
+    <td class="tt">${d.luc}</td><td>${esc((d.question||'').slice(0,26))}</td>
+    <td><span class="nhan ${(KIEU[d.ket_qua]||['n-xam'])[0]}">${(KIEU[d.outcome]||[0,d.outcome])[1]}</span></td>
+    <td class="tt">${d.ms ?? ''}${d.from_cache ? '⚡' : ''}</td></tr>`).join('') + '</table>';
 }
 
 async function napPhai() {
@@ -528,7 +528,7 @@ $('btnTomTat').onclick = async () => {
   if (!LICH_SU.length) { $('kqTT').innerHTML = '<span class="phu">chưa có hội thoại</span>'; return; }
   $('kqTT').innerHTML = '<span class="phu">đang tóm tắt…</span>';
   const r = await api('/api/tom-tat', {
-    hoiThoai: LICH_SU.map((t) => `${t.nguoi}: ${t.noi_dung}`).join('\n'),
+    hoiThoai: LICH_SU.map((t) => `${t.nguoi}: ${t.body}`).join('\n'),
     code: $('nguoi').value, threadKey: 'ui-chat',
   });
   $('kqTT').innerHTML = r.ketQua !== 'OK'

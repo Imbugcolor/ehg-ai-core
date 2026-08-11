@@ -124,7 +124,7 @@ async function cham(cauHoi, banNhap) {
   if (!m) return { lot: false, lyDo: 'không đọc được kết quả chấm', canNguoiXem: true };
   try {
     const v = JSON.parse(m[0]);
-    return { lot: !!v.lot, lyDo: v.ly_do };
+    return { lot: !!v.lot, lyDo: v.reason };
   } catch {
     return { lot: false, lyDo: 'không đọc được kết quả chấm', canNguoiXem: true };
   }

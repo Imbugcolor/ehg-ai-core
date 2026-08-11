@@ -30,15 +30,15 @@ export async function layGiongVan({ propertyId = null, loaiKhach = 'chung', ngon
   if (c && Date.now() - c.luc < NHO_TAM_MS) return c.data;
 
   const r = await sql(`
-    select * from public.ai_giong_van_ap_dung(
+    select * from public.ai_tone_resolve(
       ${propertyId ? `'${propertyId}'` : 'null'}, ${q(loaiKhach)}, ${q(ngonNgu)});`);
   const data = r.length
     ? {
-        moTa: r[0].mo_ta,
-        cauMo: r[0].cau_mo,
-        cauKet: r[0].cau_ket,
-        tuNenDung: r[0].tu_nen_dung || [],
-        tuTranh: r[0].tu_tranh || [],
+        moTa: r[0].description,
+        cauMo: r[0].opening_line,
+        cauKet: r[0].closing_line,
+        tuNenDung: r[0].preferred_words || [],
+        tuTranh: r[0].avoided_words || [],
       }
     : null;
 

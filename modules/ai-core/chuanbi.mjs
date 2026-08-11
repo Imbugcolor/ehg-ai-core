@@ -13,31 +13,31 @@ export async function chuanBi(userId, propertyId = null) {
   const r = await sql(`
     select
       (select coalesce(json_agg(json_build_object(
-                'pham_vi', s.pham_vi, 'property_id', s.property_id::text,
-                'tinh_nang', s.tinh_nang, 'ly_do', s.ly_do)), '[]'::json)
-       from public.ai_cong_tac s where s.dang_tat)              as cong_tac,
+                'pham_vi', s.scope, 'property_id', s.property_id::text,
+                'tinh_nang', s.feature, 'ly_do', s.reason)), '[]'::json)
+       from public.ai_kill_switch s where s.is_disabled)              as cong_tac,
       public.kb_version()                                       as kb_version,
       (select p.name from public.property p
         where p.id = ${propertyId ? `'${propertyId}'` : 'null'}) as ten_khach_san,
       coalesce((select string_agg(property_id::text, ',' order by property_id::text)
                 from public.user_property where user_id = '${userId}'), 'khong-co') as scope_key,
-      (select row_to_json(c) from public.ai_chi_phi() c)        as chi_phi;`);
+      (select row_to_json(c) from public.ai_cost_status() c)        as cost_usd;`);
 
   const x = r[0] || {};
   const congTac = x.cong_tac || [];
-  const cp = x.chi_phi || {};
+  const cp = x.cost_usd || {};
 
-  const uuTien = { toan_he: 1, khach_san: 2, tinh_nang: 3 };
+  const uuTien = { toan_he: 1, khach_san: 2, feature: 3 };
   const timTat = (tinhNang) => {
     const khop = congTac
       .filter(
         (s) =>
-          s.pham_vi === 'toan_he' ||
-          (s.pham_vi === 'khach_san' && propertyId && s.property_id === propertyId) ||
-          (s.pham_vi === 'tinh_nang' && s.tinh_nang === tinhNang)
+          s.scope === 'toan_he' ||
+          (s.scope === 'khach_san' && propertyId && s.property_id === propertyId) ||
+          (s.scope === 'tinh_nang' && s.feature === tinhNang)
       )
-      .sort((a, b) => uuTien[a.pham_vi] - uuTien[b.pham_vi])[0];
-    return khop ? { lyDo: khop.ly_do, phamVi: khop.pham_vi } : null;
+      .sort((a, b) => uuTien[a.scope] - uuTien[b.scope])[0];
+    return khop ? { lyDo: khop.reason, phamVi: khop.scope } : null;
   };
 
   const vuotHan = !!cp.vuot_han;

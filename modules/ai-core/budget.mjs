@@ -10,7 +10,7 @@ let nhoTam = { luc: 0, data: null };
 
 export async function tinhTrangChiPhi({ batBuocMoi = false } = {}) {
   if (!batBuocMoi && nhoTam.data && Date.now() - nhoTam.luc < NHO_TAM_MS) return nhoTam.data;
-  const r = await sql('select * from public.ai_chi_phi();');
+  const r = await sql('select * from public.ai_cost_status();');
   const x = r[0] || {};
   const data = {
     homNay: Number(x.hom_nay || 0),
@@ -47,10 +47,10 @@ export async function kiemHanMuc() {
 
 export async function datHanMuc({ ngay, thang, canhBaoO }) {
   const set = [];
-  if (ngay != null) set.push(`han_muc_ngay = ${Number(ngay)}`);
-  if (thang != null) set.push(`han_muc_thang = ${Number(thang)}`);
-  if (canhBaoO != null) set.push(`canh_bao_o = ${Number(canhBaoO)}`);
+  if (ngay != null) set.push(`daily_limit_usd = ${Number(ngay)}`);
+  if (thang != null) set.push(`monthly_limit_usd = ${Number(thang)}`);
+  if (canhBaoO != null) set.push(`warn_at_ratio = ${Number(canhBaoO)}`);
   if (!set.length) return;
-  await sql(`update public.ai_han_muc set ${set.join(', ')}, cap_nhat_luc = now() where id;`);
+  await sql(`update public.ai_budget set ${set.join(', ')}, updated_at = now() where id;`);
   nhoTam = { luc: 0, data: null };
 }

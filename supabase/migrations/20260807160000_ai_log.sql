@@ -16,35 +16,35 @@ create table if not exists public.ai_log (
   user_id       uuid references auth.users (id),
   property_id   uuid references public.property (id),
 
-  cau_hoi       text not null,          -- đã che thông tin cá nhân
-  ket_qua       text not null
-                check (ket_qua in ('TRA_LOI','KHONG_DU_CO_SO','CHAN_Y_DINH','BI_CHAN','LOI_NHA_CUNG_CAP')),
-  y_dinh        text,
-  diem          numeric(6,4),
-  so_ung_vien   int,
-  ban_nhap      text,                   -- đã che thông tin cá nhân
-  ly_do_chan    text,
-  lop_chan      int,
+  question       text not null,          -- đã che thông tin cá nhân
+  outcome       text not null
+                check (outcome in ('TRA_LOI','KHONG_DU_CO_SO','CHAN_Y_DINH','BI_CHAN','LOI_NHA_CUNG_CAP')),
+  blocked_intent        text,
+  score          numeric(6,4),
+  candidate_count   int,
+  draft      text,                   -- đã che thông tin cá nhân
+  block_reason    text,
+  block_layer      int,
 
-  model_chat    text,
-  model_rerank  text,
-  model_embed   text,
+  chat_model    text,
+  rerank_model  text,
+  embed_model   text,
 
   ms            int,
-  loi_loai      text,
-  loi_msg       text
+  error_type      text,
+  error_message       text
 );
 
 comment on table public.ai_log is
   'Nhật ký mọi lượt gọi AI. Chỉ ghi thêm. Dùng để đo tỉ lệ chặn, tỉ lệ lỗi nhà cung cấp và chất lượng bản nháp.';
-comment on column public.ai_log.cau_hoi is 'Đã che email, số điện thoại, số thẻ trước khi ghi.';
+comment on column public.ai_log.question is 'Đã che email, số điện thoại, số thẻ trước khi ghi.';
 
 create index if not exists ai_log_created_idx on public.ai_log (created_at desc);
-create index if not exists ai_log_ketqua_idx  on public.ai_log (ket_qua);
+create index if not exists ai_log_ketqua_idx  on public.ai_log (outcome);
 create index if not exists ai_log_user_idx    on public.ai_log (user_id);
 
 -- Chỉ ghi thêm: chặn sửa và xoá ở tầng dữ liệu, không dựa vào kỷ luật của code.
-create or replace function public.ai_log_chi_ghi_them()
+create or replace function public.ai_log_append_only()
 returns trigger
 language plpgsql
 as $$
@@ -56,7 +56,7 @@ $$;
 drop trigger if exists ai_log_khong_sua on public.ai_log;
 create trigger ai_log_khong_sua
   before update or delete on public.ai_log
-  for each row execute function public.ai_log_chi_ghi_them();
+  for each row execute function public.ai_log_append_only();
 
 -- RLS bật, KHÔNG có policy select cho authenticated: nhật ký chứa nội dung hội
 -- thoại nên chỉ vai trò máy chủ mới đọc được. Sau này thêm policy riêng cho

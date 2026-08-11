@@ -92,7 +92,7 @@ export function gop(soCu, phanMoi) {
 /** Tách dữ kiện từ những tin nhắn mới rồi gộp vào sổ cũ. Không bao giờ ném lỗi. */
 export async function capNhatSo(soCu, tinNhanMoi) {
   const chu = (tinNhanMoi || [])
-    .map((t) => `${t.nguoi || 'Khách'}: ${t.noiDung ?? t.noi_dung ?? ''}`)
+    .map((t) => `${t.nguoi || 'Khách'}: ${t.noiDung ?? t.body ?? ''}`)
     .join('\n')
     .trim();
   if (!chu) return soCu || {};
@@ -163,9 +163,9 @@ export async function laySo(threadKey) {
   if (!threadKey) return {};
   try {
     const r = await sql(`
-      select so from public.ai_so_ghi_nho
-      where thread_key = ${q(threadKey)} and het_han_luc > now() limit 1;`);
-    return r[0]?.so || {};
+      select facts from public.ai_thread_memory
+      where thread_key = ${q(threadKey)} and expires_at > now() limit 1;`);
+    return r[0]?.facts || {};
   } catch {
     return {};
   }
@@ -175,12 +175,12 @@ export async function luuSo(threadKey, propertyId, so) {
   if (!threadKey || !so || !Object.keys(so).length) return;
   try {
     await sql(`
-      insert into public.ai_so_ghi_nho (thread_key, property_id, so, so_luot)
+      insert into public.ai_thread_memory (thread_key, property_id, facts, update_count)
       values (${q(threadKey)}, ${propertyId ? `'${propertyId}'` : 'null'}, ${q(JSON.stringify(so))}::jsonb, 1)
       on conflict (thread_key) do update
-        set so = excluded.so,
-            so_luot = public.ai_so_ghi_nho.so_luot + 1,
-            cap_nhat_luc = now();`);
+        set facts = excluded.facts,
+            update_count = public.ai_thread_memory.update_count + 1,
+            updated_at = now();`);
   } catch (e) {
     console.error('[so_ghi_nho] không lưu được:', e.message.slice(0, 140));
   }

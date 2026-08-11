@@ -25,13 +25,13 @@ Trả về DUY NHẤT một JSON:
 
 QUY TẮC:
 - Chỉ dùng thông tin có trong hội thoại, không suy diễn thêm.
-- viec_con_treo là phần quan trọng nhất. Không có việc nào treo thì để mảng rỗng.
+- open_items là phần quan trọng nhất. Không có việc nào treo thì để mảng rỗng.
 - Không nêu lại giá, không tự kết luận thay khách sạn.`;
 
 const bam = (s) => createHash('sha256').update(s).digest('hex').slice(0, 32);
 
 /**
- * @param {{nguoi:string, luc?:string, noi_dung:string}[]} tinNhan
+ * @param {{nguoi:string, luc?:string, body:string}[]} tinNhan
  * @returns {{tomTat:string, yChinh:string[], viecConTreo:string[], camXuc:string,
  *            tuNhoLai?:boolean, ketQua?:string, lyDo?:string, ms:number}}
  */
@@ -43,24 +43,24 @@ export async function tomTat(tinNhan, { threadKey, propertyId = null } = {}) {
   if (tat) return ket({ ketQua: 'AI_DANG_TAT', lyDo: tat.lyDo });
 
   const vanBan = tinNhan
-    .map((t) => `${t.nguoi}${t.luc ? ` (${t.luc})` : ''}: ${t.noi_dung}`)
+    .map((t) => `${t.nguoi}${t.luc ? ` (${t.luc})` : ''}: ${t.body}`)
     .join('\n');
   const hash = bam(vanBan);
 
   // Đã tóm tắt đúng nội dung này rồi thì dùng lại
   const cu = await sql(`
-    select tom_tat, y_chinh, viec_con_treo, cam_xuc
-    from public.ai_tom_tat
-    where thread_key = ${q(threadKey)} and hash_noi_dung = ${q(hash)}
+    select summary, key_points, open_items, sentiment
+    from public.ai_thread_summary
+    where thread_key = ${q(threadKey)} and content_hash = ${q(hash)}
     limit 1;`);
   if (cu.length) {
     return ket({
       ketQua: 'OK',
       tuNhoLai: true,
-      tomTat: cu[0].tom_tat,
-      yChinh: cu[0].y_chinh || [],
-      viecConTreo: cu[0].viec_con_treo || [],
-      camXuc: cu[0].cam_xuc,
+      tomTat: cu[0].summary,
+      yChinh: cu[0].key_points || [],
+      viecConTreo: cu[0].open_items || [],
+      camXuc: cu[0].sentiment,
     });
   }
 
@@ -86,21 +86,21 @@ export async function tomTat(tinNhan, { threadKey, propertyId = null } = {}) {
   }
 
   const kq = {
-    tomTat: String(v.tom_tat || '').trim(),
-    yChinh: Array.isArray(v.y_chinh) ? v.y_chinh : [],
-    viecConTreo: Array.isArray(v.viec_con_treo) ? v.viec_con_treo : [],
-    camXuc: ['tich_cuc', 'trung_tinh', 'tieu_cuc'].includes(v.cam_xuc) ? v.cam_xuc : 'trung_tinh',
+    tomTat: String(v.summary || '').trim(),
+    yChinh: Array.isArray(v.key_points) ? v.key_points : [],
+    viecConTreo: Array.isArray(v.open_items) ? v.open_items : [],
+    camXuc: ['tich_cuc', 'trung_tinh', 'tieu_cuc'].includes(v.sentiment) ? v.sentiment : 'trung_tinh',
   };
 
   await sql(`
-    insert into public.ai_tom_tat
-      (thread_key, hash_noi_dung, property_id, so_tin, tom_tat, y_chinh, viec_con_treo, cam_xuc, model, ms)
+    insert into public.ai_thread_summary
+      (thread_key, content_hash, property_id, message_count, summary, key_points, open_items, sentiment, model, ms)
     values (${q(threadKey)}, ${q(hash)}, ${propertyId ? `'${propertyId}'` : 'null'},
             ${tinNhan.length}, ${q(che(kq.tomTat))},
             ${q(JSON.stringify(kq.yChinh.map(che)))}::jsonb,
             ${q(JSON.stringify(kq.viecConTreo.map(che)))}::jsonb,
             ${q(kq.camXuc)}, ${q(cfg.chat.model)}, ${Date.now() - t0})
-    on conflict (thread_key, hash_noi_dung) do nothing;`).catch(() => {});
+    on conflict (thread_key, content_hash) do nothing;`).catch(() => {});
 
   return ket({ ketQua: 'OK', ...kq });
 }

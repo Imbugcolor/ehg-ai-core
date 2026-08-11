@@ -11,37 +11,37 @@
 -- Lưu lại để không gọi model lặp. Khoá theo nội dung: có tin nhắn mới thì
 -- băm đổi, bản tóm tắt cũ tự hết hiệu lực — cùng cách làm với rag_cache.
 -- ---------------------------------------------------------------------------
-create table if not exists public.ai_tom_tat (
+create table if not exists public.ai_thread_summary (
   id           uuid primary key default gen_random_uuid(),
   thread_key   text not null,
-  hash_noi_dung text not null,
+  content_hash text not null,
   property_id  uuid references public.property (id) on delete cascade,
 
-  so_tin       int not null,
-  tom_tat      text not null,
-  y_chinh      jsonb not null default '[]'::jsonb,   -- các ý khách đã nêu
-  viec_con_treo jsonb not null default '[]'::jsonb,  -- việc chưa xử lý xong
-  cam_xuc      text,
+  message_count       int not null,
+  summary      text not null,
+  key_points      jsonb not null default '[]'::jsonb,   -- các ý khách đã nêu
+  open_items jsonb not null default '[]'::jsonb,  -- việc chưa xử lý xong
+  sentiment      text,
 
   model        text,
   ms           int,
   created_at   timestamptz not null default now(),
 
-  unique (thread_key, hash_noi_dung)
+  unique (thread_key, content_hash)
 );
 
-comment on table public.ai_tom_tat is
+comment on table public.ai_thread_summary is
   'Tóm tắt hội thoại dài. Khoá gồm băm nội dung nên có tin mới là tự tính lại.';
-comment on column public.ai_tom_tat.viec_con_treo is
+comment on column public.ai_thread_summary.open_items is
   'Việc khách đang chờ mà chưa xử lý xong. Đây là phần quan trọng nhất khi chuyển ca.';
 
-create index if not exists ai_tom_tat_thread_idx on public.ai_tom_tat (thread_key, created_at desc);
+create index if not exists ai_tom_tat_thread_idx on public.ai_thread_summary (thread_key, created_at desc);
 
-alter table public.ai_tom_tat enable row level security;
+alter table public.ai_thread_summary enable row level security;
 
-drop policy if exists ai_tom_tat_select_scoped on public.ai_tom_tat;
+drop policy if exists ai_tom_tat_select_scoped on public.ai_thread_summary;
 create policy ai_tom_tat_select_scoped
-  on public.ai_tom_tat for select
+  on public.ai_thread_summary for select
   to authenticated
   using (property_id is null or property_id in (select public.user_property_ids()));
 
@@ -52,63 +52,63 @@ create policy ai_tom_tat_select_scoped
 -- sửa được. Sửa giọng văn là việc của Marketing, không phải việc phải chờ
 -- lập trình viên triển khai lại.
 -- ---------------------------------------------------------------------------
-create table if not exists public.ai_giong_van (
+create table if not exists public.ai_tone (
   id           uuid primary key default gen_random_uuid(),
   property_id  uuid references public.property (id) on delete cascade,  -- NULL = cả chuỗi
-  loai_khach   text not null default 'chung'
-               check (loai_khach in ('chung', 'vip', 'doan_b2b', 'khach_quen', 'khieu_nai')),
-  ngon_ngu     text not null default 'vi',
+  guest_type   text not null default 'chung'
+               check (guest_type in ('chung', 'vip', 'doan_b2b', 'khach_quen', 'khieu_nai')),
+  lang     text not null default 'vi',
 
-  mo_ta        text not null,          -- hướng dẫn giọng văn, đưa thẳng vào prompt
-  cau_mo       text,
-  cau_ket      text,
-  tu_nen_dung  text[] not null default '{}',
-  tu_tranh     text[] not null default '{}',
+  description        text not null,          -- hướng dẫn giọng văn, đưa thẳng vào prompt
+  opening_line       text,
+  closing_line      text,
+  preferred_words  text[] not null default '{}',
+  avoided_words     text[] not null default '{}',
 
-  dang_dung    boolean not null default true,
-  cap_nhat_boi uuid references auth.users (id),
-  cap_nhat_luc timestamptz not null default now(),
+  is_active    boolean not null default true,
+  updated_by uuid references auth.users (id),
+  updated_at timestamptz not null default now(),
 
-  unique (property_id, loai_khach, ngon_ngu)
+  unique (property_id, guest_type, lang)
 );
 
-comment on table public.ai_giong_van is
+comment on table public.ai_tone is
   'Giọng văn theo khách sạn và loại khách. Nghiệp vụ sửa trực tiếp, không cần triển khai lại.';
 
 -- Chọn bản phù hợp nhất: riêng khách sạn + đúng loại khách > riêng khách sạn
 -- + chung > cả chuỗi + đúng loại khách > cả chuỗi + chung.
-create or replace function public.ai_giong_van_ap_dung(
+create or replace function public.ai_tone_resolve(
   p_property_id uuid default null,
   p_loai_khach  text default 'chung',
   p_ngon_ngu    text default 'vi'
 )
-returns table (mo_ta text, cau_mo text, cau_ket text, tu_nen_dung text[], tu_tranh text[])
+returns table (description text, opening_line text, closing_line text, preferred_words text[], avoided_words text[])
 language sql
 stable
 set search_path = public
 as $$
-  select g.mo_ta, g.cau_mo, g.cau_ket, g.tu_nen_dung, g.tu_tranh
-  from public.ai_giong_van g
-  where g.dang_dung
-    and g.ngon_ngu = p_ngon_ngu
+  select g.description, g.opening_line, g.closing_line, g.preferred_words, g.avoided_words
+  from public.ai_tone g
+  where g.is_active
+    and g.lang = p_ngon_ngu
     and (g.property_id is null or g.property_id = p_property_id)
-    and (g.loai_khach = p_loai_khach or g.loai_khach = 'chung')
+    and (g.guest_type = p_loai_khach or g.guest_type = 'chung')
   order by
     (g.property_id is not null) desc,
-    (g.loai_khach = p_loai_khach) desc
+    (g.guest_type = p_loai_khach) desc
   limit 1
 $$;
 
-alter table public.ai_giong_van enable row level security;
+alter table public.ai_tone enable row level security;
 
-drop policy if exists ai_giong_van_select_scoped on public.ai_giong_van;
+drop policy if exists ai_giong_van_select_scoped on public.ai_tone;
 create policy ai_giong_van_select_scoped
-  on public.ai_giong_van for select
+  on public.ai_tone for select
   to authenticated
   using (property_id is null or property_id in (select public.user_property_ids()));
 
 -- Giọng mặc định cho cả chuỗi. Đây là dữ liệu khởi tạo, Marketing sẽ sửa lại.
-insert into public.ai_giong_van (property_id, loai_khach, ngon_ngu, mo_ta, cau_mo, cau_ket, tu_nen_dung, tu_tranh)
+insert into public.ai_tone (property_id, guest_type, lang, description, opening_line, closing_line, preferred_words, avoided_words)
 values
   (null, 'chung', 'vi',
    'Lịch sự, ngắn gọn, đi thẳng vào việc. Xưng "chúng tôi", gọi khách là "quý khách". Không dùng câu sáo rỗng, không hứa những điều ngoài thẩm quyền.',
@@ -127,4 +127,4 @@ values
    'Kính gửi Quý công ty,', 'Trân trọng,',
    ARRAY['Quý công ty', 'kính gửi', 'theo yêu cầu'],
    ARRAY['bạn', 'nhé', 'giảm giá'])
-on conflict (property_id, loai_khach, ngon_ngu) do nothing;
+on conflict (property_id, guest_type, lang) do nothing;

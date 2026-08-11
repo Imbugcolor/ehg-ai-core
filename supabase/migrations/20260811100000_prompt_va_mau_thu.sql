@@ -6,7 +6,7 @@
 --
 -- Hai bảng dưới đây theo đúng lối đã làm với giọng văn: nội dung nằm ở cơ sở dữ
 -- liệu, code chỉ đọc. Khác một điểm quan trọng — prompt KHÔNG phải nội dung
--- nghiệp vụ tự sửa thoải mái như giọng văn. Sửa sai một dòng trong prompt soạn
+-- nghiệp vụ tự sửa thoải mái như giọng văn. Sửa sai một dòng trong prompt factsạn
 -- nháp là hỏng cả hệ thống, nên bảng prompt giữ lịch sử và có bản mặc định
 -- trong code làm lưới đỡ khi bảng trống hoặc lỗi.
 
@@ -16,20 +16,20 @@
 
 create table if not exists public.ai_prompt (
   id           uuid primary key default gen_random_uuid(),
-  khoa         text not null
-               check (khoa in ('soan_nhap', 'kiem_duyet', 'tom_tat', 'phan_loai', 'viet_lai_cau_hoi')),
-  ngon_ngu     text not null default 'vi',
-  noi_dung     text not null,
-  ghi_chu      text,
+  key         text not null
+               check (key in ('soan_nhap', 'kiem_duyet', 'tom_tat', 'phan_loai', 'viet_lai_cau_hoi')),
+  lang     text not null default 'vi',
+  body     text not null,
+  note      text,
 
   -- Mỗi khoá chỉ có ĐÚNG MỘT bản đang dùng. Các bản cũ giữ lại để đối chiếu khi
-  -- chất lượng bản nháp tụt sau một lần sửa prompt.
-  dang_dung    boolean not null default false,
-  phien_ban    int not null default 1,
+  -- chất lượng bản nháp tụt after_data một lần sửa prompt.
+  is_active    boolean not null default false,
+  version    int not null default 1,
 
-  cap_nhat_boi uuid references auth.users (id),
-  cap_nhat_luc timestamptz not null default now(),
-  tao_luc      timestamptz not null default now()
+  updated_by uuid references auth.users (id),
+  updated_at timestamptz not null default now(),
+  created_at      timestamptz not null default now()
 );
 
 comment on table public.ai_prompt is
@@ -40,9 +40,9 @@ comment on table public.ai_prompt is
 -- Để ở tầng ứng dụng thì sớm muộn cũng có hai bản cùng bật, và lúc đó hệ thống
 -- chạy bằng prompt nào là chuyện may rủi.
 create unique index if not exists ai_prompt_mot_ban_dang_dung
-  on public.ai_prompt (khoa, ngon_ngu) where dang_dung;
+  on public.ai_prompt (key, lang) where is_active;
 
-create index if not exists ai_prompt_khoa_idx on public.ai_prompt (khoa, ngon_ngu);
+create index if not exists ai_prompt_khoa_idx on public.ai_prompt (key, lang);
 
 alter table public.ai_prompt enable row level security;
 
@@ -64,11 +64,11 @@ create policy ai_prompt_khong_cho_doc
 -- ghi nhận yêu cầu, hướng dẫn liên hệ bộ phận đặt phòng. Những câu đó để model
 -- tự nghĩ mỗi lần một kiểu thì vừa tốn tiền vừa không đều.
 
-create table if not exists public.ai_mau_thu (
+create table if not exists public.ai_reply_template (
   id           uuid primary key default gen_random_uuid(),
   property_id  uuid references public.property (id) on delete cascade,  -- NULL = cả chuỗi
-  tinh_huong   text not null
-               check (tinh_huong in (
+  situation   text not null
+               check (situation in (
                  'xin_loi_su_co',        -- khách phàn nàn về sự cố trong phòng
                  'ghi_nhan_yeu_cau',     -- đã nhận yêu cầu, sẽ phản hồi
                  'chuyen_dat_phong',     -- chuyển câu hỏi giá/phòng trống sang bộ phận đặt phòng
@@ -77,49 +77,49 @@ create table if not exists public.ai_mau_thu (
                  'xac_nhan_thong_tin',   -- xác nhận lại thông tin đặt phòng khách cung cấp
                  'ngoai_pham_vi'         -- kho không có, mời khách liên hệ trực tiếp
                )),
-  ngon_ngu     text not null default 'vi',
+  lang     text not null default 'vi',
 
-  ten          text not null,
-  noi_dung     text not null,
-  ghi_chu      text,
+  name          text not null,
+  body     text not null,
+  note      text,
 
-  dang_dung    boolean not null default true,
-  cap_nhat_boi uuid references auth.users (id),
-  cap_nhat_luc timestamptz not null default now(),
+  is_active    boolean not null default true,
+  updated_by uuid references auth.users (id),
+  updated_at timestamptz not null default now(),
 
-  unique (property_id, tinh_huong, ngon_ngu)
+  unique (property_id, situation, lang)
 );
 
-comment on table public.ai_mau_thu is
+comment on table public.ai_reply_template is
   'Thư mẫu theo tình huống. Nghiệp vụ sửa trực tiếp. Model dùng làm khung, '
   'không chép nguyên — vẫn phải bám ngữ cảnh và tri thức lấy được.';
 
 -- Chọn bản riêng của khách sạn trước, không có thì lấy bản cả chuỗi.
-create or replace function public.ai_mau_thu_ap_dung(
+create or replace function public.ai_reply_template_resolve(
   p_property_id uuid default null,
   p_tinh_huong  text default null,
   p_ngon_ngu    text default 'vi'
 )
-returns table (ten text, noi_dung text)
+returns table (name text, body text)
 language sql
 stable
 set search_path = public
 as $$
-  select m.ten, m.noi_dung
-  from public.ai_mau_thu m
-  where m.dang_dung
-    and m.ngon_ngu = p_ngon_ngu
-    and m.tinh_huong = p_tinh_huong
+  select m.name, m.body
+  from public.ai_reply_template m
+  where m.is_active
+    and m.lang = p_ngon_ngu
+    and m.situation = p_tinh_huong
     and (m.property_id is null or m.property_id = p_property_id)
   order by (m.property_id is not null) desc
   limit 1
 $$;
 
-alter table public.ai_mau_thu enable row level security;
+alter table public.ai_reply_template enable row level security;
 
-drop policy if exists ai_mau_thu_select_scoped on public.ai_mau_thu;
+drop policy if exists ai_mau_thu_select_scoped on public.ai_reply_template;
 create policy ai_mau_thu_select_scoped
-  on public.ai_mau_thu for select
+  on public.ai_reply_template for select
   to authenticated
   using (property_id is null or property_id in (select public.user_property_ids()));
 
@@ -127,7 +127,7 @@ create policy ai_mau_thu_select_scoped
 -- Cố ý viết dạng KHUNG có chỗ trống, không phải câu hoàn chỉnh: model điền phần
 -- cụ thể từ tri thức lấy được. Mẫu hoàn chỉnh quá thì bản nháp nào cũng giống
 -- nhau và khách nhận ra ngay là thư máy.
-insert into public.ai_mau_thu (property_id, tinh_huong, ngon_ngu, ten, noi_dung, ghi_chu)
+insert into public.ai_reply_template (property_id, situation, lang, name, body, note)
 values
   (null, 'xin_loi_su_co', 'vi', 'Xin lỗi khi khách gặp sự cố',
    E'Mở đầu bằng lời xin lỗi cụ thể về đúng sự cố khách nêu, không xin lỗi chung chung.\n'
@@ -172,4 +172,4 @@ values
    'Mời khách liên hệ lễ tân hoặc bộ phận phụ trách để được hỗ trợ.\n'
    'TUYỆT ĐỐI không suy đoán hay đưa thông tin không có trong tri thức.',
    'Thà nói không biết còn hơn đoán')
-on conflict (property_id, tinh_huong, ngon_ngu) do nothing;
+on conflict (property_id, situation, lang) do nothing;

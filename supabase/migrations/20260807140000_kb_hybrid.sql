@@ -1,6 +1,6 @@
 -- =============================================================================
 -- 20260807140000_kb_hybrid.sql
--- Bổ sung cho kho tri thức sau khi chạy thử và phát hiện ba vấn đề:
+-- Bổ sung cho kho tri thức after_data khi chạy thử và phát hiện ba vấn đề:
 --   1. Chỉ dùng vector thì xếp hạng sai — đoạn chứa từ khoá phụ lại lên trên
 --   2. Điểm cosine thô không tách được đúng/sai, không dùng làm ngưỡng được
 --   3. Câu hỏi ngoài phạm vi tri thức vẫn ra kết quả trông hợp lý
